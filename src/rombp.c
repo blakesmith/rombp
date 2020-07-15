@@ -38,15 +38,15 @@ int main() {
         return errno;
     }
 
-    int rc = ips_patch(input_file, output_file, ips_file);
-    if (rc != 0) {
-        fprintf(stderr, "Failed to copy file: %d\n", rc);
+    int hunk_count = ips_patch(input_file, output_file, ips_file);
+    if (hunk_count < 0) {
+        fprintf(stderr, "Failed to copy file: %d\n", hunk_count);
         close_files(input_file, output_file, ips_file);
-        return rc;
+        return hunk_count;
     }
 
     close_files(input_file, output_file, ips_file);
 
-    fprintf(stdout, "Done patching file\n");
+    fprintf(stdout, "Done patching file, hunk count: %d\n", hunk_count);
     return 0;
 }

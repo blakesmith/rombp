@@ -9,7 +9,9 @@ enum ips_err {
 };
 
 enum ips_hunk_iter_status {
+    HUNK_ERR_IPS = -1,
     HUNK_DONE = 1,
+    HUNK_NEXT = 2,
 };
 
 typedef struct ips_hunk_header {

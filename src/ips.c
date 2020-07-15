@@ -1,3 +1,4 @@
+#include <assert.h>
 #include <errno.h>
 #include <stdio.h>
 #include <unistd.h>
@@ -8,10 +9,10 @@
 // Copy the input file to the output file, it is assumed
 // that both files will be at position 0 before this function
 // is called.
-#define BUF_SIZE 255
+#define BUF_SIZE 32768
 
 static int copy_file(FILE* input_file, FILE* output_file) {
-    char buf[BUF_SIZE];
+    uint8_t buf[BUF_SIZE];
     int rc;
 
     int infd = fileno(input_file);
@@ -55,7 +56,7 @@ static const unsigned char IPS_EXPECTED_HEADER[] = {
 static const size_t IPS_HEADER_SIZE = sizeof(IPS_EXPECTED_HEADER) / sizeof(unsigned char);
 
 static int verify_ips_header(FILE* ips_file) {
-    char buf[IPS_HEADER_SIZE];
+    uint8_t buf[IPS_HEADER_SIZE];
 
     size_t nread = fread(&buf, 1, IPS_HEADER_SIZE, ips_file);
     if (nread < IPS_HEADER_SIZE) {
@@ -73,8 +74,36 @@ static int verify_ips_header(FILE* ips_file) {
     return 0;
 }
 
+static const size_t HUNK_PREAMBLE_BYTE_SIZE = 5;
+
 static int ips_next_hunk_header(FILE* ips_file, ips_hunk_header* header) {
-    return HUNK_DONE;
+    uint8_t buf[HUNK_PREAMBLE_BYTE_SIZE];
+
+    assert(header != NULL);
+
+    // Read the hunk preamble
+    // 3 byte offset
+    // 2 byte payload length.
+    size_t nread = fread(&buf, 1, HUNK_PREAMBLE_BYTE_SIZE, ips_file);
+    if (nread < HUNK_PREAMBLE_BYTE_SIZE) {
+        int err = ferror(ips_file);
+        if (err != 0) {
+            fprintf(stderr, "Error reading from IPS file, error: %d\n", err);
+            return HUNK_ERR_IPS;
+        }
+        if (feof(ips_file) != 0) {
+            return HUNK_DONE;
+        }
+    }
+
+    // We have a 5 byte buffer of the hunk preamble, decode values:
+    header->offset = ((buf[0] << 16) & 0x00FF0000) |
+        ((buf[1] << 8) & 0x0000FF00) |
+        (buf[2] & 0x000000FF);
+    header->length = ((buf[3] << 8) & 0xFF00) |
+        (buf[4] & 0x00FF);
+
+    return HUNK_NEXT;
 }
 
 int ips_patch(FILE* input_file, FILE* output_file, FILE* ips_file) {
@@ -107,20 +136,22 @@ int ips_patch(FILE* input_file, FILE* output_file, FILE* ips_file) {
             return rc;
         } else if (rc == HUNK_DONE) {
             return hunk_count;
-        } 
+        } else {
+            assert(rc == HUNK_NEXT);
 
-        hunk_count++;
+            hunk_count++;
 
-        printf("Hunk RLE: %d, offset: %d, length: %d\n",
-               hunk_header.length == 0,
-               hunk_header.offset,
-               hunk_header.length);
+            printf("Hunk RLE: %d, offset: %d, length: %d\n",
+                   hunk_header.length == 0,
+                   hunk_header.offset,
+                   hunk_header.length);
 
-        // Temporarily: Skip the payload
-        rc = fseek(ips_file, hunk_header.length, SEEK_CUR);
-        if (rc < 0) {
-            printf("Failed to skip the hunk payload, err: %d\n", errno);
-            return rc;
+            // Temporarily: Skip the payload
+            rc = fseek(ips_file, hunk_header.length, SEEK_CUR);
+            if (rc < 0) {
+                printf("Failed to skip the hunk payload, err: %d\n", errno);
+                return rc;
+            }
         }
     }
 
