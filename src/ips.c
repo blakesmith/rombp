@@ -49,6 +49,30 @@ static int copy_file(FILE* input_file, FILE* output_file) {
     return 0;
 }
 
+static const unsigned char IPS_EXPECTED_HEADER[] = {
+    0x50, 0x41, 0x54, 0x43, 0x48 // PATCH
+};
+static const size_t IPS_HEADER_SIZE = sizeof(IPS_EXPECTED_HEADER) / sizeof(unsigned char);
+
+static int verify_ips_header(FILE* ips_file) {
+    char buf[IPS_HEADER_SIZE];
+
+    size_t nread = fread(&buf, 1, IPS_HEADER_SIZE, ips_file);
+    if (nread < IPS_HEADER_SIZE) {
+        fprintf(stderr, "IPS header malformed, expected to get at least %ld bytes in the IPS file, read: %ld\n", IPS_HEADER_SIZE, (long int)nread);
+        return IPS_INVALID_HEADER;
+    }
+
+    for (int i = 0; i < IPS_HEADER_SIZE; i++) {
+        if (IPS_EXPECTED_HEADER[i] != buf[i]) {
+            fprintf(stderr, "IPS header at byte %d doesn't match. Value: %d\n", i, buf[i]);
+            return IPS_INVALID_HEADER;
+        }
+    }
+
+    return 0;
+}
+
 int ips_patch(FILE* input_file, FILE* output_file, FILE* ips_file) {
     int rc;
 
@@ -58,5 +82,15 @@ int ips_patch(FILE* input_file, FILE* output_file, FILE* ips_file) {
         fprintf(stderr, "Failed to seek to copy input file to output file: %d\n", rc);
         return rc;
     }
+
+    rc = verify_ips_header(ips_file);
+    if (rc == IPS_INVALID_HEADER) {
+        fprintf(stderr, "IPS input file doesn't start with a PATCH header\n");
+        return rc;
+    } else if (rc != 0) {
+        fprintf(stderr, "Failed to verify IPS header: %d\n", rc);
+        return rc;
+    }
+
     return 0;
 }
