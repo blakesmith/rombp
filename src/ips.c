@@ -6,11 +6,11 @@
 
 #include "ips.h"
 
+static const size_t BUF_SIZE = 32768;
+
 // Copy the input file to the output file, it is assumed
 // that both files will be at position 0 before this function
 // is called.
-#define BUF_SIZE 32768
-
 static int copy_file(FILE* input_file, FILE* output_file) {
     uint8_t buf[BUF_SIZE];
     int rc;
@@ -55,12 +55,12 @@ static const unsigned char IPS_EXPECTED_HEADER[] = {
 };
 static const size_t IPS_HEADER_SIZE = sizeof(IPS_EXPECTED_HEADER) / sizeof(unsigned char);
 
-static int verify_ips_header(FILE* ips_file) {
+static int ips_verify_header(FILE* ips_file) {
     uint8_t buf[IPS_HEADER_SIZE];
 
     size_t nread = fread(&buf, 1, IPS_HEADER_SIZE, ips_file);
     if (nread < IPS_HEADER_SIZE) {
-        fprintf(stderr, "IPS header malformed, expected to get at least %ld bytes in the IPS file, read: %ld\n", IPS_HEADER_SIZE, (long int)nread);
+        fprintf(stderr, "IPS header malformed, expected to get at least %ld bytes in the IPS file, read: %ld\n", (long int)IPS_HEADER_SIZE, (long int)nread);
         return IPS_INVALID_HEADER;
     }
 
@@ -149,7 +149,7 @@ int ips_patch(FILE* input_file, FILE* output_file, FILE* ips_file) {
     }
 
     // Sanity check that we're looking at an IPS file.
-    rc = verify_ips_header(ips_file);
+    rc = ips_verify_header(ips_file);
     if (rc == IPS_INVALID_HEADER) {
         fprintf(stderr, "IPS input file doesn't start with a PATCH header\n");
         return rc;
