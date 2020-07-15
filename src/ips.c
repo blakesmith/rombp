@@ -173,6 +173,14 @@ int ips_patch(FILE* input_file, FILE* output_file, FILE* ips_file) {
 
             hunk_count++;
 
+            // Seek the output file to the specified hunk offset
+            rc = fseek(output_file, hunk_header.offset, SEEK_SET);
+            if (rc == -1) {
+                fprintf(stderr, "Error seeking output file to offset: %d, at hunk: %d, error: %d\n",
+                        hunk_header.offset, hunk_count, errno);
+                return rc;
+            }
+
             // 0 length header means the hunk is run length encoded (RLE).
             // We have to look into the payload to determine how big the hunk
             // is.
