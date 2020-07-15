@@ -138,6 +138,24 @@ static int ips_next_hunk_header(FILE* ips_file, ips_hunk_header* header) {
     return HUNK_NEXT;
 }
 
+// Write the rle_value to the output_file rle_hunk_length times. By the time this function is
+// called, we should assume that output_file has already been seeked to the correct position
+// in the file.
+static int ips_write_rle_hunk(FILE* output_file, uint32_t rle_hunk_length, uint8_t rle_value) {
+    // It'd be sweet if we could do this in one fwrite call. Oh well.
+    size_t nwritten;
+    for (int i = 0; i < rle_hunk_length; i++) {
+        nwritten = fwrite(&rle_value, sizeof(uint8_t), 1, output_file);
+        if (nwritten == 0) {
+            fprintf(stderr, "Failed to write RLE byte value, length: %d, value: %d, i: %d\n",
+                    rle_hunk_length, rle_value, i);
+            return -1;
+        }
+    }
+
+    return 0;
+}
+
 int ips_patch(FILE* input_file, FILE* output_file, FILE* ips_file) {
     int rc;
 
@@ -190,6 +208,12 @@ int ips_patch(FILE* input_file, FILE* output_file, FILE* ips_file) {
                 rc = ips_get_rle_payload(ips_file, &rle_hunk_length, &rle_value);
                 if (rc < 0) {
                     fprintf(stderr, "Failed to find RLE payload length, err: %d\n", rc);
+                    return rc;
+                }
+                rc = ips_write_rle_hunk(output_file, rle_hunk_length, rle_value);
+                if (rc < 0) {
+                    fprintf(stderr, "Failed to write RLE hunk value to output, at hunk: %d, rle length: %d, rle value: %d\n",
+                            hunk_count, rle_hunk_length, rle_value);
                     return rc;
                 }
             } else {
