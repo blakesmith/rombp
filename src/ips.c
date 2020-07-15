@@ -50,10 +50,10 @@ static int copy_file(FILE* input_file, FILE* output_file) {
     return 0;
 }
 
-static const unsigned char IPS_EXPECTED_HEADER[] = {
+static const uint8_t IPS_EXPECTED_HEADER[] = {
     0x50, 0x41, 0x54, 0x43, 0x48 // PATCH
 };
-static const size_t IPS_HEADER_SIZE = sizeof(IPS_EXPECTED_HEADER) / sizeof(unsigned char);
+static const size_t IPS_HEADER_SIZE = sizeof(IPS_EXPECTED_HEADER) / sizeof(uint8_t);
 
 static int ips_verify_header(FILE* ips_file) {
     uint8_t buf[IPS_HEADER_SIZE];
