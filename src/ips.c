@@ -76,13 +76,13 @@ static int ips_verify_header(FILE* ips_file) {
 
 static const size_t HUNK_PREAMBLE_BYTE_SIZE = 5;
 
-static const inline uint32_t be_3_byte_int(uint8_t *buf) {
+static const inline uint32_t be_24bit_int(uint8_t *buf) {
     return ((buf[0] << 16) & 0x00FF0000) |
         ((buf[1] << 8) & 0x0000FF00) |
         (buf[2] & 0x000000FF);
 }
 
-static const inline uint16_t be_2_byte_int(uint8_t *buf) {
+static const inline uint16_t be_16bit_int(uint8_t *buf) {
     return ((buf[0] << 8) & 0xFF00) |
         (buf[1] & 0x00FF);
 }
@@ -105,7 +105,7 @@ static int ips_get_rle_payload(FILE* ips_file, uint32_t* rle_length, uint8_t* rl
         }
     }
 
-    *rle_length = be_3_byte_int(buf);
+    *rle_length = be_24bit_int(buf);
     *rle_value = buf[3];
 
     return 0;
@@ -132,8 +132,8 @@ static int ips_next_hunk_header(FILE* ips_file, ips_hunk_header* header) {
     }
 
     // We have a 5 byte buffer of the hunk preamble, decode values:
-    header->offset = be_3_byte_int(buf);
-    header->length = be_2_byte_int(buf+3);
+    header->offset = be_24bit_int(buf);
+    header->length = be_16bit_int(buf+3);
 
     return HUNK_NEXT;
 }
