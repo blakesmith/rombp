@@ -73,6 +73,10 @@ static int verify_ips_header(FILE* ips_file) {
     return 0;
 }
 
+static int ips_next_hunk_header(FILE* ips_file, ips_hunk_header* header) {
+    return HUNK_DONE;
+}
+
 int ips_patch(FILE* input_file, FILE* output_file, FILE* ips_file) {
     int rc;
 
@@ -83,6 +87,7 @@ int ips_patch(FILE* input_file, FILE* output_file, FILE* ips_file) {
         return rc;
     }
 
+    // Sanity check that we're looking at an IPS file.
     rc = verify_ips_header(ips_file);
     if (rc == IPS_INVALID_HEADER) {
         fprintf(stderr, "IPS input file doesn't start with a PATCH header\n");
@@ -90,6 +95,33 @@ int ips_patch(FILE* input_file, FILE* output_file, FILE* ips_file) {
     } else if (rc != 0) {
         fprintf(stderr, "Failed to verify IPS header: %d\n", rc);
         return rc;
+    }
+
+    // Then, iterate through hunks
+    int hunk_count = 0;
+    ips_hunk_header hunk_header;
+    while (1) {
+        rc = ips_next_hunk_header(ips_file, &hunk_header);
+        if (rc < 0) {
+            fprintf(stderr, "Error getting next hunk, at hunk count: %d\n", hunk_count);
+            return rc;
+        } else if (rc == HUNK_DONE) {
+            return hunk_count;
+        } 
+
+        hunk_count++;
+
+        printf("Hunk RLE: %d, offset: %d, length: %d\n",
+               hunk_header.length == 0,
+               hunk_header.offset,
+               hunk_header.length);
+
+        // Temporarily: Skip the payload
+        rc = fseek(ips_file, hunk_header.length, SEEK_CUR);
+        if (rc < 0) {
+            printf("Failed to skip the hunk payload, err: %d\n", errno);
+            return rc;
+        }
     }
 
     return 0;
