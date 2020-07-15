@@ -76,6 +76,41 @@ static int verify_ips_header(FILE* ips_file) {
 
 static const size_t HUNK_PREAMBLE_BYTE_SIZE = 5;
 
+static const inline uint32_t be_3_byte_int(uint8_t *buf) {
+    return ((buf[0] << 16) & 0x00FF0000) |
+        ((buf[1] << 8) & 0x0000FF00) |
+        (buf[2] & 0x000000FF);
+}
+
+static const inline uint16_t be_2_byte_int(uint8_t *buf) {
+    return ((buf[0] << 8) & 0xFF00) |
+        (buf[1] & 0x00FF);
+}
+
+static const size_t RLE_PAYLOAD_BYTE_SIZE = 4;
+// Extract the RLE length, as well as the byte value that needs to repeated (rle_length times)
+static int ips_get_rle_payload(FILE* ips_file, uint32_t* rle_length, uint8_t* rle_value) {
+    uint8_t buf[RLE_PAYLOAD_BYTE_SIZE];
+
+    size_t nread = fread(&buf, 1, RLE_PAYLOAD_BYTE_SIZE, ips_file);
+    if (nread < RLE_PAYLOAD_BYTE_SIZE) {
+        int err = ferror(ips_file);
+        if (err != 0) {
+            fprintf(stderr, "Error reading from IPS file for RLE payload, error: %d\n", err);
+            return -1;
+        }
+        if (feof(ips_file) != 0) {
+            fprintf(stderr, "Unexpectedly reached EOF while trying to read the RLE payload\n");
+            return -1;
+        }
+    }
+
+    *rle_length = be_3_byte_int(buf);
+    *rle_value = buf[3];
+
+    return 0;
+}
+
 static int ips_next_hunk_header(FILE* ips_file, ips_hunk_header* header) {
     uint8_t buf[HUNK_PREAMBLE_BYTE_SIZE];
 
@@ -97,11 +132,8 @@ static int ips_next_hunk_header(FILE* ips_file, ips_hunk_header* header) {
     }
 
     // We have a 5 byte buffer of the hunk preamble, decode values:
-    header->offset = ((buf[0] << 16) & 0x00FF0000) |
-        ((buf[1] << 8) & 0x0000FF00) |
-        (buf[2] & 0x000000FF);
-    header->length = ((buf[3] << 8) & 0xFF00) |
-        (buf[4] & 0x00FF);
+    header->offset = be_3_byte_int(buf);
+    header->length = be_2_byte_int(buf+3);
 
     return HUNK_NEXT;
 }
@@ -141,17 +173,31 @@ int ips_patch(FILE* input_file, FILE* output_file, FILE* ips_file) {
 
             hunk_count++;
 
+            // 0 length header means the hunk is run length encoded (RLE).
+            // We have to look into the payload to determine how big the hunk
+            // is.
+            if (hunk_header.length == 0) {
+                uint32_t rle_hunk_length;
+                uint8_t rle_value;
+                rc = ips_get_rle_payload(ips_file, &rle_hunk_length, &rle_value);
+                if (rc < 0) {
+                    fprintf(stderr, "Failed to find RLE payload length, err: %d\n", rc);
+                    return rc;
+                }
+            } else {
+                // Temporarily: Skip the payload
+                rc = fseek(ips_file, hunk_header.length, SEEK_CUR);
+                if (rc < 0) {
+                    printf("Failed to skip the hunk payload, err: %d\n", errno);
+                    return rc;
+                }
+            }
+
             printf("Hunk RLE: %d, offset: %d, length: %d\n",
                    hunk_header.length == 0,
                    hunk_header.offset,
                    hunk_header.length);
 
-            // Temporarily: Skip the payload
-            rc = fseek(ips_file, hunk_header.length, SEEK_CUR);
-            if (rc < 0) {
-                printf("Failed to skip the hunk payload, err: %d\n", errno);
-                return rc;
-            }
         }
     }
 
