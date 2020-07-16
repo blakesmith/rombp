@@ -2,6 +2,7 @@
 #include <errno.h>
 #include <stdio.h>
 #include <unistd.h>
+#include <sys/param.h>
 #include <sys/stat.h>
 
 #include "ips.h"
@@ -87,7 +88,7 @@ static const inline uint16_t be_16bit_int(uint8_t *buf) {
         (buf[1] & 0x00FF);
 }
 
-static const size_t RLE_PAYLOAD_BYTE_SIZE = 4;
+static const size_t RLE_PAYLOAD_BYTE_SIZE = 3;
 // Extract the RLE length, as well as the byte value that needs to repeated (rle_length times)
 static int ips_get_rle_payload(FILE* ips_file, uint32_t* rle_length, uint8_t* rle_value) {
     uint8_t buf[RLE_PAYLOAD_BYTE_SIZE];
@@ -144,6 +145,7 @@ static int ips_next_hunk_header(FILE* ips_file, ips_hunk_header* header) {
 static int ips_write_rle_hunk(FILE* output_file, uint32_t rle_hunk_length, uint8_t rle_value) {
     // It'd be sweet if we could do this in one fwrite call. Oh well.
     size_t nwritten;
+
     for (int i = 0; i < rle_hunk_length; i++) {
         nwritten = fwrite(&rle_value, sizeof(uint8_t), 1, output_file);
         if (nwritten == 0) {
@@ -155,7 +157,43 @@ static int ips_write_rle_hunk(FILE* output_file, uint32_t rle_hunk_length, uint8
 
     return 0;
 }
+ 
+// For normal hunks (non-RLE encoded), copy payload values from the IPS file to the output.
+// By the time this function is called, the ips_file should be positioned at the start of the payload
+// and the output file should already be seeked to the destination file position.
+static int ips_write_hunk(FILE* ips_file, FILE* output_file, uint32_t hunk_length) {
+    uint8_t buf[BUF_SIZE];
 
+    size_t length_remaining = hunk_length;
+    size_t nread;
+    size_t nwritten;
+    while (length_remaining > 0) {
+        size_t amount_to_copy = MIN(BUF_SIZE, length_remaining);
+        printf("Length remaining: %ld, amount_to_copy: %ld\n", length_remaining, amount_to_copy);
+
+        nread = fread(&buf, 1, amount_to_copy, ips_file);
+        if (nread < amount_to_copy) {
+            int err = ferror(ips_file);
+            if (err != 0) {
+                fprintf(stderr, "Error reading payload IPS file, error: %d\n", err);
+                return -1;
+            }
+            if (feof(ips_file) != 0) {
+                fprintf(stderr, "Unexpected EOF while trying to read payload from IPS file, remaining: %ld, ips file pos: %ld, nread: %ld\n", length_remaining, ftell(ips_file), nread);
+                return -1;
+            }
+        }
+        nwritten = fwrite(&buf, 1, nread, output_file);
+        if (nwritten < nread) {
+            fprintf(stderr, "Failed to write all data to output file, expected to write: %ld bytes, wrote: %ld\n", nread, nwritten);
+            return -1;
+        }
+        length_remaining -= nwritten;
+    }
+
+    return 0;
+}
+ 
 int ips_patch(FILE* input_file, FILE* output_file, FILE* ips_file) {
     int rc;
 
@@ -199,6 +237,13 @@ int ips_patch(FILE* input_file, FILE* output_file, FILE* ips_file) {
                 return rc;
             }
 
+            
+            printf("Hunk RLE: %d, offset: %d, length: %d, ips_offset: %ld\n",
+                   hunk_header.length == 0,
+                   hunk_header.offset,
+                   hunk_header.length,
+                   ftell(ips_file));
+
             // 0 length header means the hunk is run length encoded (RLE).
             // We have to look into the payload to determine how big the hunk
             // is.
@@ -217,19 +262,13 @@ int ips_patch(FILE* input_file, FILE* output_file, FILE* ips_file) {
                     return rc;
                 }
             } else {
-                // Temporarily: Skip the payload
-                rc = fseek(ips_file, hunk_header.length, SEEK_CUR);
+                rc = ips_write_hunk(ips_file, output_file, hunk_header.length);
                 if (rc < 0) {
-                    printf("Failed to skip the hunk payload, err: %d\n", errno);
+                    fprintf(stderr, "Failed writing non-RLE hunk value to output, at hunk: %d, length: %d\n",
+                            hunk_count, hunk_header.length);
                     return rc;
                 }
             }
-
-            printf("Hunk RLE: %d, offset: %d, length: %d\n",
-                   hunk_header.length == 0,
-                   hunk_header.offset,
-                   hunk_header.length);
-
         }
     }
 
