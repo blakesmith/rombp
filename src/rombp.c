@@ -79,7 +79,11 @@ int main() {
                 break;
         }
 
-        ui_draw(&ui);
+        rc = ui_draw(&ui);
+        if (rc != 0) {
+            fprintf(stderr, "Failed to draw: %d\n", rc);
+            return rc;
+        }
 
         SDL_Delay(16);
     }

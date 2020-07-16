@@ -172,23 +172,42 @@ rombp_ui_event ui_handle_event(rombp_ui* ui, rombp_patch_command* command) {
     return EV_NONE;
 }
 
-static void draw_menu(rombp_ui* ui) {
+static int draw_menu(rombp_ui* ui) {
+    int rc;
+
     static const int menu_padding = 50;
-    const SDL_Rect menu_item_rect = {
-        menu_padding,
-        menu_padding,
-        ui->sdl.screen_width - (menu_padding * 2),
-        ui->sdl.screen_height / MENU_ITEM_COUNT,
-    };
-    SDL_SetRenderDrawColor(ui->sdl.renderer, 0x00, 0xFF, 0x00, 0xFF);
-    SDL_RenderFillRect(ui->sdl.renderer, &menu_item_rect);
+    SDL_Rect menu_item_rect;
+
+    int nitems = MIN(MENU_ITEM_COUNT, ui->namelist_size);
+    for (int i = 0; i < nitems; i++) {
+        menu_item_rect.x = menu_padding;
+        menu_item_rect.y = (i * 16) + 5;
+        menu_item_rect.w = 50;
+        menu_item_rect.h = 16;
+
+        rc = SDL_RenderCopy(ui->sdl.renderer, ui->namelist_text[i], NULL, &menu_item_rect);
+        if (rc < 0) {
+            fprintf(stderr, "Failed to render text surface: %s\n", SDL_GetError());
+            return rc;
+        }
+    }
+
+    return 0;
 }
 
-void ui_draw(rombp_ui* ui) {
+int ui_draw(rombp_ui* ui) {
+    int rc;
+
     SDL_SetRenderDrawColor(ui->sdl.renderer, 0x00, 0x10, 0x00, 0xFF);
     SDL_RenderClear(ui->sdl.renderer);
 
-    draw_menu(ui);
+    rc = draw_menu(ui);
+    if (rc != 0) {
+        fprintf(stderr, "Failed to draw menu: %d\n", rc);
+        return rc;
+    }
 
     SDL_RenderPresent(ui->sdl.renderer);
+
+    return 0;
 }

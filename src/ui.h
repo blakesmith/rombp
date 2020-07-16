@@ -39,7 +39,7 @@ typedef struct rombp_patch_command {
 
 int ui_start(rombp_ui* ui);
 void ui_stop(rombp_ui* ui);
-void ui_draw(rombp_ui* ui);
+int ui_draw(rombp_ui* ui);
 rombp_ui_event ui_handle_event(rombp_ui* ui, rombp_patch_command* command);
 
 #endif
