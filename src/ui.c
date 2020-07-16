@@ -96,8 +96,23 @@ rombp_ui_event ui_handle_event(rombp_ui* ui, rombp_patch_command* command) {
     return EV_NONE;
 }
 
+static void draw_menu(rombp_ui* ui) {
+    static const int menu_padding = 50;
+    const SDL_Rect menu_item_rect = {
+        menu_padding,
+        menu_padding,
+        ui->sdl.screen_width - (menu_padding * 2),
+        ui->sdl.screen_height / 24
+    };
+    SDL_SetRenderDrawColor(ui->sdl.renderer, 0x00, 0xFF, 0x00, 0xFF);
+    SDL_RenderFillRect(ui->sdl.renderer, &menu_item_rect);
+}
+
 void ui_draw(rombp_ui* ui) {
     SDL_SetRenderDrawColor(ui->sdl.renderer, 0x00, 0x10, 0x00, 0xFF);
     SDL_RenderClear(ui->sdl.renderer);
+
+    draw_menu(ui);
+
     SDL_RenderPresent(ui->sdl.renderer);
 }
