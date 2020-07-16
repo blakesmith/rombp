@@ -194,6 +194,12 @@ static int draw_menu(rombp_ui* ui) {
             fprintf(stderr, "Failed to render text surface: %s\n", SDL_GetError());
             return rc;
         }
+
+        if (i == ui->selected_item) {
+            menu_item_rect.w = ui->sdl.screen_width - (menu_padding_left_right * 2);
+            SDL_SetRenderDrawColor(ui->sdl.renderer, 0x5B, 0x2C, 0x6F, 0xFF);
+            SDL_RenderFillRect(ui->sdl.renderer, &menu_item_rect);
+        }
     }
 
     return 0;
