@@ -67,7 +67,7 @@ int main() {
 
         switch (event) {
             case EV_QUIT:
-                // TODO: Do UI cleanup, free resources
+                ui_stop(&ui);
                 return 0;
             case EV_PATCH_COMMAND:
                 rc = patch_file(&command);

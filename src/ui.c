@@ -4,7 +4,7 @@ int ui_start(rombp_ui* ui) {
     printf("Starting UI\n");
     ui->sdl.screen_width = 320;
     ui->sdl.screen_height = 240;
-    ui->sdl.scaling_factor = 1.0;
+    ui->sdl.scaling_factor = 2.0;
     
     if (SDL_Init(SDL_INIT_EVERYTHING) < 0) {
         fprintf(stderr, "SDL could not initialize! SDL_Error: %s\n", SDL_GetError());
@@ -37,6 +37,14 @@ int ui_start(rombp_ui* ui) {
     }
 
     return 0;
+}
+
+void ui_stop(rombp_ui* ui) {
+    SDL_DestroyRenderer(ui->sdl.renderer);
+    SDL_DestroyWindow(ui->sdl.window);
+    TTF_Quit();
+
+    SDL_Quit();
 }
 
 static void ui_resize_window(rombp_ui* ui, int width, int height) {
