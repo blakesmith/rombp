@@ -117,11 +117,12 @@ int ui_start(rombp_ui* ui) {
 }
 
 void ui_stop(rombp_ui* ui) {
+    ui_directory_free(ui);
+
     TTF_CloseFont(ui->sdl.menu_font);
     SDL_DestroyRenderer(ui->sdl.renderer);
     SDL_DestroyWindow(ui->sdl.window);
     TTF_Quit();
-
     SDL_Quit();
 }
 
@@ -175,10 +176,10 @@ rombp_ui_event ui_handle_event(rombp_ui* ui, rombp_patch_command* command) {
 }
 
 static int draw_menu(rombp_ui* ui) {
-    int rc;
-
     static const int menu_padding_left_right = 15;
     static const int menu_padding_top_bottom = 5;
+
+    int rc;
     SDL_Rect menu_item_rect;
 
     int nitems = MIN(MENU_ITEM_COUNT, ui->namelist_size);
