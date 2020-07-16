@@ -106,8 +106,8 @@ static int ips_get_rle_payload(FILE* ips_file, uint32_t* rle_length, uint8_t* rl
         }
     }
 
-    *rle_length = be_24bit_int(buf);
-    *rle_value = buf[3];
+    *rle_length = be_16bit_int(buf);
+    *rle_value = buf[2];
 
     return 0;
 }
