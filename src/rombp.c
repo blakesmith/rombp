@@ -2,6 +2,7 @@
 #include <errno.h>
 
 #include "ips.h"
+#include "ui.h"
 
 void close_files(FILE* input_file, FILE* output_file, FILE* ips_file) {
     if (input_file != NULL) {

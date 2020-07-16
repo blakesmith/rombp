@@ -14,7 +14,7 @@ OPK_DIR=opk
 OPK_FILE=$(PROG).gcw0.desktop
 OPK_ICON=icon.png
 
-C_SOURCES=src/rombp.c src/ips.c
+C_SOURCES=src/rombp.c src/ips.c src/ui.c
 
 OBJS=$(subst .c,.o,$(C_SOURCES))
 
