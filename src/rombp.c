@@ -54,10 +54,34 @@ static int patch_file(rombp_patch_command* command) {
 
 int main() {
     rombp_patch_command command;
+    rombp_ui ui;
 
-    command.input_file = "fixtures/Super Metroid (JU) [!].smc";
-    command.output_file = "Ascent.Super Metroid (JU) [!].smc";
-    command.ips_file = "fixtures/Ascent1.12.IPS";
+    int rc = ui_start(&ui);
+    if (rc != 0) {
+        fprintf(stderr, "Failed to start UI, error code: %d\n", rc);
+        return 1;
+    }
 
-    return patch_file(&command);
+    while (1) {
+        rombp_ui_event event = ui_handle_event(&ui, &command);
+
+        switch (event) {
+            case EV_QUIT:
+                // TODO: Do UI cleanup, free resources
+                return 0;
+            case EV_PATCH_COMMAND:
+                rc = patch_file(&command);
+                if (rc != 0) {
+                    fprintf(stderr, "Failed to patch file: %d\n", rc);
+                }
+                break;
+            default:
+                break;
+        }
+
+        ui_draw(&ui);
+
+        SDL_Delay(16);
+    }
+
 }
