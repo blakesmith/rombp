@@ -2,6 +2,8 @@
 
 #include "ui.h"
 
+static const int MENU_FONT_SIZE = 16;
+
 static void ui_directory_free(rombp_ui* ui) {
     if (ui->namelist != NULL) {
         for (int i = 0; i < ui->namelist_size; i++) {
@@ -99,7 +101,7 @@ int ui_start(rombp_ui* ui) {
         return -1;
     }
 
-    ui->sdl.menu_font = TTF_OpenFont("assets/fonts/PressStart2P.ttf", 16);
+    ui->sdl.menu_font = TTF_OpenFont("assets/fonts/PressStart2P.ttf", MENU_FONT_SIZE);
     if (ui->sdl.menu_font == NULL) {
         fprintf(stderr, "Failed to load menu font: %s\n", TTF_GetError());
         return -1;
@@ -175,15 +177,16 @@ rombp_ui_event ui_handle_event(rombp_ui* ui, rombp_patch_command* command) {
 static int draw_menu(rombp_ui* ui) {
     int rc;
 
-    static const int menu_padding = 50;
+    static const int menu_padding_left_right = 15;
+    static const int menu_padding_top_bottom = 5;
     SDL_Rect menu_item_rect;
 
     int nitems = MIN(MENU_ITEM_COUNT, ui->namelist_size);
     for (int i = 0; i < nitems; i++) {
-        menu_item_rect.x = menu_padding;
-        menu_item_rect.y = (i * 16) + 5;
-        menu_item_rect.w = 50;
-        menu_item_rect.h = 16;
+        menu_item_rect.x = menu_padding_left_right;
+        menu_item_rect.y = (i * MENU_FONT_SIZE) + menu_padding_top_bottom;
+        menu_item_rect.w = MENU_FONT_SIZE * strlen(ui->namelist[i]->d_name);
+        menu_item_rect.h = MENU_FONT_SIZE;
 
         rc = SDL_RenderCopy(ui->sdl.renderer, ui->namelist_text[i], NULL, &menu_item_rect);
         if (rc < 0) {
