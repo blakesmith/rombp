@@ -8,7 +8,7 @@ else
 endif
 
 CFLAGS=-Wall -Isrc
-LDFLAGS=-lSDL2 -lm -lstdc++ -pthread -Wl,--as-needed -Wl,--gc-sections -s
+LDFLAGS=-lSDL2 -lSDL2_ttf -lm -lstdc++ -pthread -Wl,--as-needed -Wl,--gc-sections -s
 
 OPK_DIR=opk
 OPK_FILE=$(PROG).gcw0.desktop
