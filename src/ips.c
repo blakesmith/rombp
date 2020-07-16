@@ -169,7 +169,6 @@ static int ips_write_hunk(FILE* ips_file, FILE* output_file, uint32_t hunk_lengt
     size_t nwritten;
     while (length_remaining > 0) {
         size_t amount_to_copy = MIN(BUF_SIZE, length_remaining);
-        printf("Length remaining: %ld, amount_to_copy: %ld\n", length_remaining, amount_to_copy);
 
         nread = fread(&buf, 1, amount_to_copy, ips_file);
         if (nread < amount_to_copy) {
@@ -179,13 +178,13 @@ static int ips_write_hunk(FILE* ips_file, FILE* output_file, uint32_t hunk_lengt
                 return -1;
             }
             if (feof(ips_file) != 0) {
-                fprintf(stderr, "Unexpected EOF while trying to read payload from IPS file, remaining: %ld, ips file pos: %ld, nread: %ld\n", length_remaining, ftell(ips_file), nread);
+                fprintf(stderr, "Unexpected EOF while trying to read payload from IPS file, remaining: %ld, ips file pos: %ld, nread: %ld\n", (long int)length_remaining, ftell(ips_file), (long int)nread);
                 return -1;
             }
         }
         nwritten = fwrite(&buf, 1, nread, output_file);
         if (nwritten < nread) {
-            fprintf(stderr, "Failed to write all data to output file, expected to write: %ld bytes, wrote: %ld\n", nread, nwritten);
+            fprintf(stderr, "Failed to write all data to output file, expected to write: %ld bytes, wrote: %ld\n", (long int)nread, (long int)nwritten);
             return -1;
         }
         length_remaining -= nwritten;
