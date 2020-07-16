@@ -1,7 +1,70 @@
+#include <sys/param.h>
+
 #include "ui.h"
+
+static void ui_directory_free(rombp_ui* ui) {
+    if (ui->namelist != NULL) {
+        for (int i = 0; i < ui->namelist_size; i++) {
+            free(ui->namelist[i]);
+        }
+        free(ui->namelist);
+        ui->namelist = NULL;
+    }
+    if (ui->namelist_text != NULL) {
+        for (int i = 0; i < ui->namelist_size; i++) {
+            SDL_DestroyTexture(ui->namelist_text[i]);
+        }
+        free(ui->namelist_text);
+        ui->namelist_text = NULL;
+    }
+}
+
+static int ui_render_menu_fonts(rombp_ui* ui) {
+    ui->namelist_text = calloc(sizeof(SDL_Texture*), ui->namelist_size);
+    if (ui->namelist_text == NULL) {
+        fprintf(stderr, "Failed to allocate menu text texture array\n");
+        return -1;
+    }
+    for (int i = 0; i < ui->namelist_size; i++) {
+        SDL_Color inactive_color = { 0xFF, 0xFF, 0xFF };
+        SDL_Surface* text_surface = TTF_RenderText_Solid(ui->sdl.menu_font, ui->namelist[i]->d_name, inactive_color);
+        if (text_surface == NULL) {
+            fprintf(stderr, "Could not convert menu text to a surface: %s\n", SDL_GetError());
+            return -1;
+        }
+        SDL_Texture* text_texture = SDL_CreateTextureFromSurface(ui->sdl.renderer, text_surface);
+        if (text_texture == NULL) {
+            fprintf(stderr, "Could not convert menu text to texture: %s\n", SDL_GetError());
+            return -1;
+        }
+        SDL_FreeSurface(text_surface);
+        ui->namelist_text[i] = text_texture;
+    }
+
+    return 0;
+}
+
+static int ui_scan_directory(rombp_ui* ui, const char* dir) {
+    ui_directory_free(ui);
+    
+    int namelist_size = scandir(dir, &ui->namelist, NULL, alphasort);
+    if (namelist_size == -1) {
+        fprintf(stderr, "Failed to scan directory: %s\n", dir);
+        return -1;
+    }
+    ui->namelist_size = namelist_size;
+    ui->selected_item = 0;
+
+    return ui_render_menu_fonts(ui);
+}
 
 int ui_start(rombp_ui* ui) {
     printf("Starting UI\n");
+
+    ui->namelist = NULL;
+    ui->namelist_text = NULL;
+
+    ui->selected_item = 0;
     ui->sdl.screen_width = 320;
     ui->sdl.screen_height = 240;
     ui->sdl.scaling_factor = 2.0;
@@ -36,10 +99,23 @@ int ui_start(rombp_ui* ui) {
         return -1;
     }
 
+    ui->sdl.menu_font = TTF_OpenFont("assets/fonts/PressStart2P.ttf", 16);
+    if (ui->sdl.menu_font == NULL) {
+        fprintf(stderr, "Failed to load menu font: %s\n", TTF_GetError());
+        return -1;
+    }
+
+    int rc = ui_scan_directory(ui, ".");
+    if (rc < 0) {
+        fprintf(stderr, "Failed to scan directory, error code: %d\n", rc);
+        return -1;
+    }
+
     return 0;
 }
 
 void ui_stop(rombp_ui* ui) {
+    TTF_CloseFont(ui->sdl.menu_font);
     SDL_DestroyRenderer(ui->sdl.renderer);
     SDL_DestroyWindow(ui->sdl.window);
     TTF_Quit();
@@ -102,7 +178,7 @@ static void draw_menu(rombp_ui* ui) {
         menu_padding,
         menu_padding,
         ui->sdl.screen_width - (menu_padding * 2),
-        ui->sdl.screen_height / 24
+        ui->sdl.screen_height / MENU_ITEM_COUNT,
     };
     SDL_SetRenderDrawColor(ui->sdl.renderer, 0x00, 0xFF, 0x00, 0xFF);
     SDL_RenderFillRect(ui->sdl.renderer, &menu_item_rect);

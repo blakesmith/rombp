@@ -1,6 +1,7 @@
 #ifndef ROMBP_UI_H_
 #define ROMBP_UI_H_
 
+#include <dirent.h>
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_ttf.h>
 
@@ -10,10 +11,18 @@ typedef struct rombp_sdl {
     float scaling_factor;
     SDL_Window* window;
     SDL_Renderer* renderer;
+    TTF_Font* menu_font;
 } rombp_sdl;
+
+#define MENU_ITEM_COUNT 24
 
 typedef struct rombp_ui {
     rombp_sdl sdl;
+    uint8_t selected_item;
+
+    struct dirent** namelist;
+    SDL_Texture** namelist_text;
+    int namelist_size;
 } rombp_ui;
 
 typedef enum rombp_ui_event {
