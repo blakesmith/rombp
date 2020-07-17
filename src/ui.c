@@ -62,12 +62,12 @@ static int ui_render_menu_fonts(rombp_ui* ui) {
     return 0;
 }
 
-static int ui_scan_directory(rombp_ui* ui, const char* dir) {
+static int ui_scan_directory(rombp_ui* ui) {
     ui_directory_free(ui);
     
-    int namelist_size = scandir(dir, &ui->namelist, NULL, dir_alphasort);
+    int namelist_size = scandir(ui->current_directory, &ui->namelist, NULL, dir_alphasort);
     if (namelist_size == -1) {
-        fprintf(stderr, "Failed to scan directory: %s\n", dir);
+        fprintf(stderr, "Failed to scan directory: %s\n", ui->current_directory);
         return -1;
     }
     ui->namelist_size = namelist_size;
@@ -76,12 +76,42 @@ static int ui_scan_directory(rombp_ui* ui, const char* dir) {
     return ui_render_menu_fonts(ui);
 }
 
+static int ui_change_directory(rombp_ui* ui, char* dir) {
+    size_t size = strlen(dir) + 1;
+
+    if (ui->current_directory == NULL) {
+        ui->current_directory = malloc(size);
+        if (ui->current_directory == NULL) {
+            fprintf(stderr, "Failed to alloc directory path: %s\n", dir);
+            return -1;
+        }
+        strncpy(ui->current_directory, dir, size);
+    } else {
+        size_t next_size = strlen(ui->current_directory) + strlen(dir) + 2;
+        size_t current_directory_size = strlen(ui->current_directory);
+
+        char* next_directory = malloc(next_size);
+        if (next_directory == NULL) {
+            fprintf(stderr, "Failed to alloc next directory path: %s\n", dir);
+            return -1;
+        }
+        strncpy(next_directory, ui->current_directory, current_directory_size);
+        strncpy(next_directory + current_directory_size, "/", 1);
+        strncpy(next_directory + current_directory_size + 1, dir, strlen(dir) + 1);
+        free(ui->current_directory);
+        ui->current_directory = next_directory;
+    }
+
+    return 0;
+}
+
 int ui_start(rombp_ui* ui) {
     printf("Starting UI\n");
 
     ui->namelist = NULL;
     ui->namelist_text = NULL;
-
+    ui->current_directory = NULL;
+    
     ui->selected_item = 0;
     ui->sdl.screen_width = 320;
     ui->sdl.screen_height = 240;
@@ -123,7 +153,12 @@ int ui_start(rombp_ui* ui) {
         return -1;
     }
 
-    int rc = ui_scan_directory(ui, ".");
+    int rc = ui_change_directory(ui, ".");
+    if (rc < 0) {
+        fprintf(stderr, "Failed to change directory: %d\n", rc);
+        return -1;
+    }
+    rc = ui_scan_directory(ui);
     if (rc < 0) {
         fprintf(stderr, "Failed to scan directory, error code: %d\n", rc);
         return -1;
@@ -134,6 +169,9 @@ int ui_start(rombp_ui* ui) {
 
 void ui_stop(rombp_ui* ui) {
     ui_directory_free(ui);
+    if (ui->current_directory != NULL) {
+        free(ui->current_directory);
+    }
 
     TTF_CloseFont(ui->sdl.menu_font);
     SDL_DestroyRenderer(ui->sdl.renderer);
@@ -147,8 +185,28 @@ static void ui_resize_window(rombp_ui* ui, int width, int height) {
     ui->sdl.screen_height = height;
 }
 
+static int ui_handle_select(rombp_ui* ui, rombp_patch_command* command) {
+    struct dirent* selected_item = ui->namelist[ui->selected_item];
+    int rc;
+
+    if (selected_item->d_type == DT_DIR) {
+        printf("Got directory selection\n");
+        rc = ui_change_directory(ui, selected_item->d_name);
+        if (rc != 0) {
+            fprintf(stderr, "Failed to change directory: %s, rc: %d\n",selected_item->d_name, rc);
+            return -1;
+        }
+        return ui_scan_directory(ui);
+    } else if (selected_item->d_type == DT_REG) {
+        printf("Got file selection\n");
+    }
+
+    return 0;
+}
+
 rombp_ui_event ui_handle_event(rombp_ui* ui, rombp_patch_command* command) {
     SDL_Event event;
+    int rc;
 
     while (SDL_PollEvent(&event) != 0) {
         int nitems = MIN(MENU_ITEM_COUNT, ui->namelist_size);
@@ -158,12 +216,19 @@ rombp_ui_event ui_handle_event(rombp_ui* ui, rombp_patch_command* command) {
                     case SDLK_ESCAPE:
                     case SDLK_q:
                         return EV_QUIT;
-                    case SDLK_RETURN:
+                    case SDLK_a:
                         // TODO: Stop hardcoding, get from an actual FS dir list
                         command->input_file = "fixtures/Super Metroid (JU) [!].smc";
                         command->output_file = "Ascent.Super Metroid (JU) [!].smc";
                         command->ips_file = "fixtures/Ascent1.12.IPS";
                         return EV_PATCH_COMMAND;
+                    case SDLK_RETURN:
+                        rc = ui_handle_select(ui, command);
+                        if (rc != 0) {
+                            fprintf(stderr, "Failed to handle select event: %d\n", rc);
+                            return EV_NONE;
+                        }
+                        break;
                     case SDLK_DOWN:
                         ui->selected_item = (ui->selected_item == nitems - 1) ? nitems -1 : ui->selected_item + 1;
                         break;

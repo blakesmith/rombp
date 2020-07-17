@@ -20,6 +20,7 @@ typedef struct rombp_ui {
     rombp_sdl sdl;
     uint8_t selected_item;
 
+    char* current_directory;
     struct dirent** namelist;
     SDL_Texture** namelist_text;
     int namelist_size;
