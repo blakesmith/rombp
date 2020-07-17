@@ -135,6 +135,7 @@ rombp_ui_event ui_handle_event(rombp_ui* ui, rombp_patch_command* command) {
     SDL_Event event;
 
     while (SDL_PollEvent(&event) != 0) {
+        int nitems = MIN(MENU_ITEM_COUNT, ui->namelist_size);
         switch (event.type) {
             case SDL_KEYDOWN:
                 switch (event.key.keysym.sym) {
@@ -147,6 +148,12 @@ rombp_ui_event ui_handle_event(rombp_ui* ui, rombp_patch_command* command) {
                         command->output_file = "Ascent.Super Metroid (JU) [!].smc";
                         command->ips_file = "fixtures/Ascent1.12.IPS";
                         return EV_PATCH_COMMAND;
+                    case SDLK_DOWN:
+                        ui->selected_item = (ui->selected_item == nitems - 1) ? nitems -1 : ui->selected_item + 1;
+                        break;
+                    case SDLK_UP:
+                        ui->selected_item = ui->selected_item == 0 ? 0 : ui->selected_item - 1;
+                        break;
                     default:
                         break;
                 }
@@ -186,8 +193,16 @@ static int draw_menu(rombp_ui* ui) {
     for (int i = 0; i < nitems; i++) {
         menu_item_rect.x = menu_padding_left_right;
         menu_item_rect.y = (i * MENU_FONT_SIZE) + menu_padding_top_bottom;
-        menu_item_rect.w = MENU_FONT_SIZE * strlen(ui->namelist[i]->d_name);
         menu_item_rect.h = MENU_FONT_SIZE;
+
+
+        if (i == ui->selected_item) {
+            menu_item_rect.w = ui->sdl.screen_width - menu_padding_left_right;
+            SDL_SetRenderDrawColor(ui->sdl.renderer, 0x5B, 0x2C, 0x6F, 0xFF);
+            SDL_RenderFillRect(ui->sdl.renderer, &menu_item_rect);
+        }
+
+        menu_item_rect.w = MENU_FONT_SIZE * strlen(ui->namelist[i]->d_name);
 
         rc = SDL_RenderCopy(ui->sdl.renderer, ui->namelist_text[i], NULL, &menu_item_rect);
         if (rc < 0) {
@@ -195,11 +210,6 @@ static int draw_menu(rombp_ui* ui) {
             return rc;
         }
 
-        if (i == ui->selected_item) {
-            menu_item_rect.w = ui->sdl.screen_width - (menu_padding_left_right * 2);
-            SDL_SetRenderDrawColor(ui->sdl.renderer, 0x5B, 0x2C, 0x6F, 0xFF);
-            SDL_RenderFillRect(ui->sdl.renderer, &menu_item_rect);
-        }
     }
 
     return 0;
