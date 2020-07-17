@@ -14,11 +14,12 @@ typedef struct rombp_sdl {
     TTF_Font* menu_font;
 } rombp_sdl;
 
-#define MENU_ITEM_COUNT 24
+#define MENU_ITEM_COUNT 12
 
 typedef struct rombp_ui {
     rombp_sdl sdl;
-    uint8_t selected_item;
+    uint16_t selected_item;
+    uint16_t selected_offset;
 
     char* current_directory;
     struct dirent** namelist;

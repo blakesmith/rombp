@@ -72,6 +72,7 @@ static int ui_scan_directory(rombp_ui* ui) {
     }
     ui->namelist_size = namelist_size;
     ui->selected_item = 0;
+    ui->selected_offset = 0;
 
     return ui_render_menu_fonts(ui);
 }
@@ -123,6 +124,7 @@ int ui_start(rombp_ui* ui) {
     ui->current_directory = NULL;
     
     ui->selected_item = 0;
+    ui->selected_offset = 0;
     ui->sdl.screen_width = 320;
     ui->sdl.screen_height = 240;
     ui->sdl.scaling_factor = 2.0;
@@ -258,10 +260,24 @@ rombp_ui_event ui_handle_event(rombp_ui* ui, rombp_patch_command* command) {
                         }
                         break;
                     case SDLK_DOWN:
-                        ui->selected_item = (ui->selected_item == nitems - 1) ? nitems -1 : ui->selected_item + 1;
+                        if (ui->selected_item == (nitems - 1)) {
+                            // Don't allow any paging offset if the number of directory items fits on the screen at once. Otherwise,
+                            // make the last allowed offset the difference of the two.
+                            int max_offset = ui->namelist_size == nitems ? 0 : ui->namelist_size - nitems;
+
+                            ui->selected_item = nitems - 1;
+                            ui->selected_offset = ui->selected_offset == max_offset ? max_offset : ui->selected_offset + 1;
+                        } else {
+                            ui->selected_item = ui->selected_item + 1;
+                        }
                         break;
                     case SDLK_UP:
-                        ui->selected_item = ui->selected_item == 0 ? 0 : ui->selected_item - 1;
+                        if (ui->selected_item == 0) {
+                            ui->selected_item = 0;
+                            ui->selected_offset = ui->selected_offset == 0 ? 0 : ui->selected_offset - 1;
+                        } else {
+                            ui->selected_item = ui->selected_item - 1;
+                        }
                         break;
                     default:
                         break;
@@ -311,9 +327,10 @@ static int draw_menu(rombp_ui* ui) {
             SDL_RenderFillRect(ui->sdl.renderer, &menu_item_rect);
         }
 
-        menu_item_rect.w = MENU_FONT_SIZE * strlen(ui->namelist[i]->d_name);
+        size_t paging_offset = ui->selected_offset + i;
+        menu_item_rect.w = MENU_FONT_SIZE * strlen(ui->namelist[paging_offset]->d_name);
 
-        rc = SDL_RenderCopy(ui->sdl.renderer, ui->namelist_text[i], NULL, &menu_item_rect);
+        rc = SDL_RenderCopy(ui->sdl.renderer, ui->namelist_text[paging_offset], NULL, &menu_item_rect);
         if (rc < 0) {
             fprintf(stderr, "Failed to render text surface: %s\n", SDL_GetError());
             return rc;
