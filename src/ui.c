@@ -4,6 +4,16 @@
 
 static const int MENU_FONT_SIZE = 16;
 
+static int dir_alphasort(const struct dirent** a, const struct dirent** b) {
+    if ((*a)->d_type == DT_DIR && (*b)->d_type == DT_REG) {
+        return -1;
+    } else if ((*a)->d_type == DT_REG && (*b)->d_type == DT_DIR) {
+        return 1;
+    } else {
+        return alphasort(a, b);
+    }
+}
+
 static void ui_directory_free(rombp_ui* ui) {
     if (ui->namelist != NULL) {
         for (int i = 0; i < ui->namelist_size; i++) {
@@ -55,7 +65,7 @@ static int ui_render_menu_fonts(rombp_ui* ui) {
 static int ui_scan_directory(rombp_ui* ui, const char* dir) {
     ui_directory_free(ui);
     
-    int namelist_size = scandir(dir, &ui->namelist, NULL, alphasort);
+    int namelist_size = scandir(dir, &ui->namelist, NULL, dir_alphasort);
     if (namelist_size == -1) {
         fprintf(stderr, "Failed to scan directory: %s\n", dir);
         return -1;
