@@ -21,7 +21,7 @@ static int patch_file(rombp_patch_command* command) {
 
     FILE* input_file = fopen(command->input_file, "r");
     if (input_file == NULL) {
-        fprintf(stderr, "Failed to open input file: %d\n", errno);
+        fprintf(stderr, "Failed to open input file: %s, errno: %d\n", command->input_file, errno);
         return errno;
     }
 
@@ -47,6 +47,7 @@ static int patch_file(rombp_patch_command* command) {
     }
 
     close_files(input_file, output_file, ips_file);
+    ui_free_command(command);
 
     fprintf(stdout, "Done patching file, hunk count: %d\n", hunk_count);
     return 0;
@@ -55,6 +56,10 @@ static int patch_file(rombp_patch_command* command) {
 int main() {
     rombp_patch_command command;
     rombp_ui ui;
+
+    command.input_file = NULL;
+    command.ips_file = NULL;
+    command.output_file = NULL;
 
     int rc = ui_start(&ui);
     if (rc != 0) {

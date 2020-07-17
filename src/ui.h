@@ -33,14 +33,15 @@ typedef enum rombp_ui_event {
 } rombp_ui_event;
 
 typedef struct rombp_patch_command {
-    const char* input_file;
-    const char* output_file;
-    const char* ips_file;
+    char* input_file;
+    char* output_file;
+    char* ips_file;
 } rombp_patch_command;
 
 int ui_start(rombp_ui* ui);
 void ui_stop(rombp_ui* ui);
 int ui_draw(rombp_ui* ui);
 rombp_ui_event ui_handle_event(rombp_ui* ui, rombp_patch_command* command);
+void ui_free_command(rombp_patch_command* command);
 
 #endif

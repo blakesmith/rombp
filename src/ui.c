@@ -76,6 +76,21 @@ static int ui_scan_directory(rombp_ui* ui) {
     return ui_render_menu_fonts(ui);
 }
 
+static char* concat_path(char* parent, char* child) {
+    size_t next_size = strlen(parent) + strlen(child) + 2;
+    size_t parent_size = strlen(parent);
+
+    char* next_path = malloc(next_size);
+    if (next_path == NULL) {
+        fprintf(stderr, "Failed to alloc next childectory path: %s\n", child);
+        return NULL;
+    }
+    strncpy(next_path, parent, parent_size);
+    strncpy(next_path + parent_size, "/", 2);
+    strncpy(next_path + parent_size + 1, child, strlen(child) + 1);
+    return next_path;
+}
+
 static int ui_change_directory(rombp_ui* ui, char* dir) {
     size_t size = strlen(dir) + 1;
 
@@ -87,17 +102,12 @@ static int ui_change_directory(rombp_ui* ui, char* dir) {
         }
         strncpy(ui->current_directory, dir, size);
     } else {
-        size_t next_size = strlen(ui->current_directory) + strlen(dir) + 2;
-        size_t current_directory_size = strlen(ui->current_directory);
-
-        char* next_directory = malloc(next_size);
+        char* next_directory = concat_path(ui->current_directory, dir);
         if (next_directory == NULL) {
-            fprintf(stderr, "Failed to alloc next directory path: %s\n", dir);
+            fprintf(stderr, "Couldn't get next directory\n");
             return -1;
         }
-        strncpy(next_directory, ui->current_directory, current_directory_size);
-        strncpy(next_directory + current_directory_size, "/", 1);
-        strncpy(next_directory + current_directory_size + 1, dir, strlen(dir) + 1);
+
         free(ui->current_directory);
         ui->current_directory = next_directory;
     }
@@ -199,9 +209,30 @@ static int ui_handle_select(rombp_ui* ui, rombp_patch_command* command) {
         return ui_scan_directory(ui);
     } else if (selected_item->d_type == DT_REG) {
         printf("Got file selection\n");
+        if (command->input_file == NULL) {
+            command->input_file = concat_path(ui->current_directory, selected_item->d_name);
+        } else if (command->ips_file == NULL) {
+            command->ips_file = concat_path(ui->current_directory, selected_item->d_name);
+            command->output_file = concat_path(ui->current_directory, "PATCHED.smc");
+        }
     }
 
     return 0;
+}
+
+void ui_free_command(rombp_patch_command* command) {
+    if (command->input_file != NULL) {
+        free(command->input_file);
+        command->input_file = NULL;
+    }
+    if (command->ips_file != NULL) {
+        free(command->ips_file);
+        command->ips_file = NULL;
+    }
+    if (command->output_file != NULL) {
+        free(command->output_file);
+        command->output_file = NULL;
+    }
 }
 
 rombp_ui_event ui_handle_event(rombp_ui* ui, rombp_patch_command* command) {
@@ -216,17 +247,14 @@ rombp_ui_event ui_handle_event(rombp_ui* ui, rombp_patch_command* command) {
                     case SDLK_ESCAPE:
                     case SDLK_q:
                         return EV_QUIT;
-                    case SDLK_a:
-                        // TODO: Stop hardcoding, get from an actual FS dir list
-                        command->input_file = "fixtures/Super Metroid (JU) [!].smc";
-                        command->output_file = "Ascent.Super Metroid (JU) [!].smc";
-                        command->ips_file = "fixtures/Ascent1.12.IPS";
-                        return EV_PATCH_COMMAND;
                     case SDLK_RETURN:
                         rc = ui_handle_select(ui, command);
                         if (rc != 0) {
                             fprintf(stderr, "Failed to handle select event: %d\n", rc);
                             return EV_NONE;
+                        }
+                        if (command->input_file != NULL && command->ips_file != NULL) {
+                            return EV_PATCH_COMMAND;
                         }
                         break;
                     case SDLK_DOWN:
