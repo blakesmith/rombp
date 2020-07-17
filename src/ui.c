@@ -198,7 +198,7 @@ static void ui_resize_window(rombp_ui* ui, int width, int height) {
 }
 
 static int ui_handle_select(rombp_ui* ui, rombp_patch_command* command) {
-    struct dirent* selected_item = ui->namelist[ui->selected_item];
+    struct dirent* selected_item = ui->namelist[ui->selected_item + ui->selected_offset];
     int rc;
 
     if (selected_item->d_type == DT_DIR) {
