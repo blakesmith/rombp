@@ -27,9 +27,15 @@ static int ui_render_menu_fonts(rombp_ui* ui) {
         fprintf(stderr, "Failed to allocate menu text texture array\n");
         return -1;
     }
+
+    static const SDL_Color file_color = { 0xFF, 0xFF, 0xFF };
+    static const SDL_Color directory_color = { 0xAE, 0xD6, 0xF1 };
+
     for (int i = 0; i < ui->namelist_size; i++) {
-        SDL_Color inactive_color = { 0xFF, 0xFF, 0xFF };
-        SDL_Surface* text_surface = TTF_RenderText_Solid(ui->sdl.menu_font, ui->namelist[i]->d_name, inactive_color);
+        unsigned char type = ui->namelist[i]->d_type;
+        SDL_Surface* text_surface = TTF_RenderText_Solid(ui->sdl.menu_font,
+                                                         ui->namelist[i]->d_name,
+                                                         type == DT_DIR ? directory_color : file_color);
         if (text_surface == NULL) {
             fprintf(stderr, "Could not convert menu text to a surface: %s\n", SDL_GetError());
             return -1;
