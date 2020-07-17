@@ -18,7 +18,10 @@ typedef struct rombp_sdl {
 
 typedef struct rombp_ui {
     rombp_sdl sdl;
+    // The item that's actually selected
     uint16_t selected_item;
+    // Scrolling support: The starting offset to start rendering items in the
+    // directory listing.
     uint16_t selected_offset;
 
     char* current_directory;
