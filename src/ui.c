@@ -32,8 +32,11 @@ static void ui_directory_free(rombp_ui* ui) {
 }
 
 static void ui_bottom_bar_free(rombp_ui* ui) {
-    if (ui->bottom_bar_text != NULL) {
-        SDL_DestroyTexture(ui->bottom_bar_text);
+    if (ui->bottom_bar_text_1 != NULL) {
+        SDL_DestroyTexture(ui->bottom_bar_text_1);
+    }
+    if (ui->bottom_bar_text_2 != NULL) {
+        SDL_DestroyTexture(ui->bottom_bar_text_2);
     }
 }
 
@@ -122,24 +125,40 @@ static int ui_change_directory(rombp_ui* ui, char* dir) {
     return 0;
 }
 
-static const char* BOTTOM_BAR_ITEM_1 = "Select original file | Y=select, B=quit";
-
-static int ui_setup_bottom_bar(rombp_ui* ui) {
-    static const SDL_Color text_color = { 0xFF, 0xFF, 0xFF };
+static int new_text_texture(rombp_ui* ui, const char* text, SDL_Color color, SDL_Texture** texture) {
     SDL_Surface* text_surface = TTF_RenderText_Solid(ui->sdl.menu_font,
-                                                     BOTTOM_BAR_ITEM_1,
-                                                     text_color);
+                                                     text,
+                                                     color);
     if (text_surface == NULL) {
-        fprintf(stderr, "Could not convert menu text to a surface: %s\n", SDL_GetError());
+        fprintf(stderr, "Could not convert text to a surface: %s\n", SDL_GetError());
         return -1;
     }
-    SDL_Texture* text_texture = SDL_CreateTextureFromSurface(ui->sdl.renderer, text_surface);
-    if (text_texture == NULL) {
-        fprintf(stderr, "Could not convert menu text to texture: %s\n", SDL_GetError());
+    *texture = SDL_CreateTextureFromSurface(ui->sdl.renderer, text_surface);
+    if (*texture == NULL) {
+        fprintf(stderr, "Could not convert text to texture: %s\n", SDL_GetError());
         return -1;
     }
     SDL_FreeSurface(text_surface);
-    ui->bottom_bar_text = text_texture;
+    return 0;
+}
+
+static const char* BOTTOM_BAR_ITEM_1 = "Select ROM file | Y=select, B=quit";
+static const char* BOTTOM_BAR_ITEM_2 = "Select IPS file | Y=select, B=back";
+
+static int ui_setup_bottom_bar(rombp_ui* ui) {
+    static const SDL_Color text_color = { 0xFF, 0xFF, 0xFF };
+    int rc;
+
+    rc = new_text_texture(ui, BOTTOM_BAR_ITEM_1, text_color, &ui->bottom_bar_text_1);
+    if (rc != 0) {
+        fprintf(stderr, "Failed to create bottom bar text: %d\n", rc);
+        return rc;
+    }
+    rc = new_text_texture(ui, BOTTOM_BAR_ITEM_2, text_color, &ui->bottom_bar_text_2);
+    if (rc != 0) {
+        fprintf(stderr, "Failed to create bottom bar text: %d\n", rc);
+        return rc;
+    }
 
     return 0;
 }
@@ -150,7 +169,8 @@ int ui_start(rombp_ui* ui) {
     ui->namelist = NULL;
     ui->namelist_text = NULL;
     ui->current_directory = NULL;
-    
+
+    ui->current_screen = SELECT_ROM;
     ui->selected_item = 0;
     ui->selected_offset = 0;
     ui->sdl.screen_width = 640;
@@ -232,6 +252,19 @@ static void ui_resize_window(rombp_ui* ui, int width, int height) {
     ui->sdl.screen_height = height;
 }
 
+static rombp_ui_event ui_handle_back(rombp_ui* ui, rombp_patch_command* command) {
+    if (command->input_file == NULL) {
+        return EV_QUIT;
+    } else if (command->input_file != NULL) {
+        free(command->input_file);
+        command->input_file = NULL;
+        ui->current_screen = SELECT_ROM;
+        return EV_NONE;
+    }
+
+    return EV_NONE;
+}
+
 static int ui_handle_select(rombp_ui* ui, rombp_patch_command* command) {
     struct dirent* selected_item = ui->namelist[ui->selected_item + ui->selected_offset];
     int rc;
@@ -248,6 +281,7 @@ static int ui_handle_select(rombp_ui* ui, rombp_patch_command* command) {
         printf("Got file selection\n");
         if (command->input_file == NULL) {
             command->input_file = concat_path(ui->current_directory, selected_item->d_name);
+            ui->current_screen = SELECT_IPS;
         } else if (command->ips_file == NULL) {
             command->ips_file = concat_path(ui->current_directory, selected_item->d_name);
             command->output_file = concat_path(ui->current_directory, "PATCHED.smc");
@@ -284,13 +318,17 @@ rombp_ui_event ui_handle_event(rombp_ui* ui, rombp_patch_command* command) {
                     case SDLK_ESCAPE:
                     case SDLK_q:
                         return EV_QUIT;
+                    case SDLK_b:
+                        return ui_handle_back(ui, command);
                     case SDLK_RETURN:
+                    case SDLK_y:
                         rc = ui_handle_select(ui, command);
                         if (rc != 0) {
                             fprintf(stderr, "Failed to handle select event: %d\n", rc);
                             return EV_NONE;
                         }
                         if (command->input_file != NULL && command->ips_file != NULL) {
+                            ui->current_screen = SELECT_ROM;
                             return EV_PATCH_COMMAND;
                         }
                         break;
@@ -354,12 +392,23 @@ static int draw_bottom_bar(rombp_ui* ui) {
     SDL_SetRenderDrawColor(ui->sdl.renderer, 0x21, 0x2F, 0x3C, 0xFF);
     SDL_RenderFillRect(ui->sdl.renderer, &bottom_bar_rect);
 
-    bottom_bar_rect.w = MENU_FONT_SIZE * strlen(BOTTOM_BAR_ITEM_1);
-
-    rc = SDL_RenderCopy(ui->sdl.renderer, ui->bottom_bar_text, NULL, &bottom_bar_rect);
-    if (rc < 0) {
-        fprintf(stderr, "Failed to render text surface: %s\n", SDL_GetError());
-        return rc;
+    switch (ui->current_screen) {
+        case SELECT_ROM:
+            bottom_bar_rect.w = MENU_FONT_SIZE * strlen(BOTTOM_BAR_ITEM_1);
+            rc = SDL_RenderCopy(ui->sdl.renderer, ui->bottom_bar_text_1, NULL, &bottom_bar_rect);
+            if (rc < 0) {
+                fprintf(stderr, "Failed to render text surface: %s\n", SDL_GetError());
+                return rc;
+            }
+            break;
+        case SELECT_IPS:
+            bottom_bar_rect.w = MENU_FONT_SIZE * strlen(BOTTOM_BAR_ITEM_2);
+            rc = SDL_RenderCopy(ui->sdl.renderer, ui->bottom_bar_text_2, NULL, &bottom_bar_rect);
+            if (rc < 0) {
+                fprintf(stderr, "Failed to render text surface: %s\n", SDL_GetError());
+                return rc;
+            }
+            break;
     }
 
     return 0;

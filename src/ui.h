@@ -5,6 +5,11 @@
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_ttf.h>
 
+typedef enum rombp_screen {
+    SELECT_ROM = 0,
+    SELECT_IPS = 1,
+} rombp_screen;
+
 typedef struct rombp_sdl {
     int screen_width;
     int screen_height;
@@ -17,6 +22,7 @@ typedef struct rombp_sdl {
 #define MENU_ITEM_COUNT 28
 
 typedef struct rombp_ui {
+    rombp_screen current_screen;
     rombp_sdl sdl;
     // The item that's actually selected
     uint16_t selected_item;
@@ -29,7 +35,8 @@ typedef struct rombp_ui {
     SDL_Texture** namelist_text;
     int namelist_size;
 
-    SDL_Texture* bottom_bar_text;
+    SDL_Texture* bottom_bar_text_1;
+    SDL_Texture* bottom_bar_text_2;
 } rombp_ui;
 
 typedef enum rombp_ui_event {
