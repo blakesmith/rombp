@@ -286,6 +286,10 @@ static rombp_ui_event ui_handle_back(rombp_ui* ui, rombp_patch_command* command)
         free(command->input_file);
         command->input_file = NULL;
         ui->current_screen = SELECT_ROM;
+        int rc = ui_status_bar_reset_text(ui, &ui->nav_bar, STATUS_BAR_TEXT_ROM);
+        if (rc != 0) {
+            rombp_log_err("Failed to reset status bar text");
+        }
         return EV_NONE;
     }
 
