@@ -148,10 +148,11 @@ static int ui_setup_status_bar(rombp_ui* ui, rombp_ui_status_bar *status_bar) {
 static void ui_status_bar_free(rombp_ui_status_bar* status_bar) {
     if (status_bar->text_texture != NULL) {
         SDL_DestroyTexture(status_bar->text_texture);
+        status_bar->text_texture = NULL;
     }
 }
 
-static int ui_status_bar_reset_text(rombp_ui* ui, rombp_ui_status_bar* status_bar, const char* text) {
+int ui_status_bar_reset_text(rombp_ui* ui, rombp_ui_status_bar* status_bar, const char* text) {
     ui_status_bar_free(status_bar);
     status_bar->text = text;
     status_bar->text_len = strlen(text);
@@ -335,6 +336,7 @@ static int ui_handle_select(rombp_ui* ui, rombp_patch_command* command) {
     } else if (selected_item->d_type == DT_REG) {
         rombp_log_info("Got file selection\n");
         if (command->input_file == NULL) {
+            ui_status_bar_free(&ui->bottom_bar);
             command->input_file = concat_path(ui->current_directory, selected_item->d_name);
             ui->current_screen = SELECT_IPS;
             rc = ui_status_bar_reset_text(ui, &ui->nav_bar, STATUS_BAR_TEXT_IPS);
@@ -482,6 +484,10 @@ static int draw_status_bar(rombp_ui* ui, rombp_ui_status_bar* status_bar) {
                            status_bar->background_color.b,
                            0xFF);
     SDL_RenderFillRect(ui->sdl.renderer, &status_bar->position);
+
+    if (status_bar->text_texture == NULL) {
+        return 0;
+    }
 
     // Make a copy of position
     SDL_Rect text_rect = status_bar->position;

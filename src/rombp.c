@@ -63,6 +63,7 @@ static rombp_patch_err patch_file(rombp_patch_command* command) {
     rombp_patch_type patch_type = detect_patch_type(ips_file);
     if (patch_type == PATCH_TYPE_UNKNOWN) {
         rombp_log_err("Bad patch file type: %d\n", patch_type);
+        ui_free_command(command);
         close_files(input_file, output_file, ips_file);
         return ERR_BAD_PATCH_TYPE;
     }
@@ -106,6 +107,7 @@ int main() {
             case EV_PATCH_COMMAND:
                 err = patch_file(&command);
                 if (err == ERR_BAD_PATCH_TYPE) {
+                    ui_status_bar_reset_text(&ui, &ui.bottom_bar, "ERROR: Not a valid patch type");
                     rombp_log_err("Invalid patch type\n");
                 } else if (err == ERR_FILE_IO) {
                     rombp_log_err("Failed to patch file, io error: %d\n", rc);

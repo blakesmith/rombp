@@ -63,6 +63,7 @@ typedef struct rombp_patch_command {
 int ui_start(rombp_ui* ui);
 void ui_stop(rombp_ui* ui);
 int ui_draw(rombp_ui* ui);
+int ui_status_bar_reset_text(rombp_ui* ui, rombp_ui_status_bar* status_bar, const char* text);
 rombp_ui_event ui_handle_event(rombp_ui* ui, rombp_patch_command* command);
 void ui_free_command(rombp_patch_command* command);
 
