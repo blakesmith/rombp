@@ -6,6 +6,7 @@
 #include <sys/stat.h>
 
 #include "ips.h"
+#include "log.h"
 
 static const size_t BUF_SIZE = 32768;
 
@@ -18,13 +19,13 @@ static int copy_file(FILE* input_file, FILE* output_file) {
 
     int infd = fileno(input_file);
     if (infd == -1) {
-        fprintf(stderr, "Bad input file, is the stream closed?\n");
+        rombp_log_err("Bad input file, is the stream closed?\n");
         return infd;
     }
     struct stat input_file_stat;
     rc = fstat(infd, &input_file_stat);
     if (rc == -1) {
-        fprintf(stderr, "Failed to stat input file, errno: %d\n", errno);
+        rombp_log_err("Failed to stat input file, errno: %d\n", errno);
         return rc;
     }
 
@@ -35,7 +36,7 @@ static int copy_file(FILE* input_file, FILE* output_file) {
         total_read += nread;
         if (nread < BUF_SIZE) {
             if (total_read < input_file_size) {
-                fprintf(stderr, "Failed to read the entire input file, read: %ld bytes, input file size: %ld\n", (long int)total_read, (long int)input_file_size);
+                rombp_log_err("Failed to read the entire input file, read: %ld bytes, input file size: %ld\n", (long int)total_read, (long int)input_file_size);
                 return -1;
             } else {
                 return 0;
@@ -43,7 +44,7 @@ static int copy_file(FILE* input_file, FILE* output_file) {
         }
         size_t nwritten = fwrite(&buf, 1, nread, output_file);
         if (nwritten < nread) {
-            fprintf(stderr, "Tried to copy %ld bytes to the output file, but only copied: %ld\n", (long int)nread, (long int)nwritten);
+            rombp_log_err("Tried to copy %ld bytes to the output file, but only copied: %ld\n", (long int)nread, (long int)nwritten);
             return -1;
         }
     }
@@ -61,13 +62,13 @@ static int ips_verify_header(FILE* ips_file) {
 
     size_t nread = fread(&buf, 1, IPS_HEADER_SIZE, ips_file);
     if (nread < IPS_HEADER_SIZE) {
-        fprintf(stderr, "IPS header malformed, expected to get at least %ld bytes in the IPS file, read: %ld\n", (long int)IPS_HEADER_SIZE, (long int)nread);
+        rombp_log_err("IPS header malformed, expected to get at least %ld bytes in the IPS file, read: %ld\n", (long int)IPS_HEADER_SIZE, (long int)nread);
         return IPS_INVALID_HEADER;
     }
 
     for (int i = 0; i < IPS_HEADER_SIZE; i++) {
         if (IPS_EXPECTED_HEADER[i] != buf[i]) {
-            fprintf(stderr, "IPS header at byte %d doesn't match. Value: %d\n", i, buf[i]);
+            rombp_log_err("IPS header at byte %d doesn't match. Value: %d\n", i, buf[i]);
             return IPS_INVALID_HEADER;
         }
     }
@@ -97,11 +98,11 @@ static int ips_get_rle_payload(FILE* ips_file, uint32_t* rle_length, uint8_t* rl
     if (nread < RLE_PAYLOAD_BYTE_SIZE) {
         int err = ferror(ips_file);
         if (err != 0) {
-            fprintf(stderr, "Error reading from IPS file for RLE payload, error: %d\n", err);
+            rombp_log_err("Error reading from IPS file for RLE payload, error: %d\n", err);
             return -1;
         }
         if (feof(ips_file) != 0) {
-            fprintf(stderr, "Unexpectedly reached EOF while trying to read the RLE payload\n");
+            rombp_log_err("Unexpectedly reached EOF while trying to read the RLE payload\n");
             return -1;
         }
     }
@@ -124,7 +125,7 @@ static int ips_next_hunk_header(FILE* ips_file, ips_hunk_header* header) {
     if (nread < HUNK_PREAMBLE_BYTE_SIZE) {
         int err = ferror(ips_file);
         if (err != 0) {
-            fprintf(stderr, "Error reading from IPS file, error: %d\n", err);
+            rombp_log_err("Error reading from IPS file, error: %d\n", err);
             return HUNK_ERR_IPS;
         }
         if (feof(ips_file) != 0) {
@@ -149,7 +150,7 @@ static int ips_write_rle_hunk(FILE* output_file, uint32_t rle_hunk_length, uint8
     for (int i = 0; i < rle_hunk_length; i++) {
         nwritten = fwrite(&rle_value, sizeof(uint8_t), 1, output_file);
         if (nwritten == 0) {
-            fprintf(stderr, "Failed to write RLE byte value, length: %d, value: %d, i: %d\n",
+            rombp_log_err("Failed to write RLE byte value, length: %d, value: %d, i: %d\n",
                     rle_hunk_length, rle_value, i);
             return -1;
         }
@@ -174,17 +175,17 @@ static int ips_write_hunk(FILE* ips_file, FILE* output_file, uint32_t hunk_lengt
         if (nread < amount_to_copy) {
             int err = ferror(ips_file);
             if (err != 0) {
-                fprintf(stderr, "Error reading payload IPS file, error: %d\n", err);
+                rombp_log_err("Error reading payload IPS file, error: %d\n", err);
                 return -1;
             }
             if (feof(ips_file) != 0) {
-                fprintf(stderr, "Unexpected EOF while trying to read payload from IPS file, remaining: %ld, ips file pos: %ld, nread: %ld\n", (long int)length_remaining, ftell(ips_file), (long int)nread);
+                rombp_log_err("Unexpected EOF while trying to read payload from IPS file, remaining: %ld, ips file pos: %ld, nread: %ld\n", (long int)length_remaining, ftell(ips_file), (long int)nread);
                 return -1;
             }
         }
         nwritten = fwrite(&buf, 1, nread, output_file);
         if (nwritten < nread) {
-            fprintf(stderr, "Failed to write all data to output file, expected to write: %ld bytes, wrote: %ld\n", (long int)nread, (long int)nwritten);
+            rombp_log_err("Failed to write all data to output file, expected to write: %ld bytes, wrote: %ld\n", (long int)nread, (long int)nwritten);
             return -1;
         }
         length_remaining -= nwritten;
@@ -199,17 +200,17 @@ int ips_patch(FILE* input_file, FILE* output_file, FILE* ips_file) {
     // First, copy the input to output
     rc = copy_file(input_file, output_file);
     if (rc != 0) {
-        fprintf(stderr, "Failed to seek to copy input file to output file: %d\n", rc);
+        rombp_log_err("Failed to seek to copy input file to output file: %d\n", rc);
         return rc;
     }
 
     // Sanity check that we're looking at an IPS file.
     rc = ips_verify_header(ips_file);
     if (rc == IPS_INVALID_HEADER) {
-        fprintf(stderr, "IPS input file doesn't start with a PATCH header\n");
+        rombp_log_err("IPS input file doesn't start with a PATCH header\n");
         return rc;
     } else if (rc != 0) {
-        fprintf(stderr, "Failed to verify IPS header: %d\n", rc);
+        rombp_log_err("Failed to verify IPS header: %d\n", rc);
         return rc;
     }
 
@@ -219,7 +220,7 @@ int ips_patch(FILE* input_file, FILE* output_file, FILE* ips_file) {
     while (1) {
         rc = ips_next_hunk_header(ips_file, &hunk_header);
         if (rc < 0) {
-            fprintf(stderr, "Error getting next hunk, at hunk count: %d\n", hunk_count);
+            rombp_log_err("Error getting next hunk, at hunk count: %d\n", hunk_count);
             return rc;
         } else if (rc == HUNK_DONE) {
             return hunk_count;
@@ -231,17 +232,17 @@ int ips_patch(FILE* input_file, FILE* output_file, FILE* ips_file) {
             // Seek the output file to the specified hunk offset
             rc = fseek(output_file, hunk_header.offset, SEEK_SET);
             if (rc == -1) {
-                fprintf(stderr, "Error seeking output file to offset: %d, at hunk: %d, error: %d\n",
-                        hunk_header.offset, hunk_count, errno);
+                rombp_log_err("Error seeking output file to offset: %d, at hunk: %d, error: %d\n",
+                              hunk_header.offset, hunk_count, errno);
                 return rc;
             }
 
             
-            printf("Hunk RLE: %d, offset: %d, length: %d, ips_offset: %ld\n",
-                   hunk_header.length == 0,
-                   hunk_header.offset,
-                   hunk_header.length,
-                   ftell(ips_file));
+            rombp_log_info("Hunk RLE: %d, offset: %d, length: %d, ips_offset: %ld\n",
+                           hunk_header.length == 0,
+                           hunk_header.offset,
+                           hunk_header.length,
+                           ftell(ips_file));
 
             // 0 length header means the hunk is run length encoded (RLE).
             // We have to look into the payload to determine how big the hunk
@@ -251,20 +252,20 @@ int ips_patch(FILE* input_file, FILE* output_file, FILE* ips_file) {
                 uint8_t rle_value;
                 rc = ips_get_rle_payload(ips_file, &rle_hunk_length, &rle_value);
                 if (rc < 0) {
-                    fprintf(stderr, "Failed to find RLE payload length, err: %d\n", rc);
+                    rombp_log_err("Failed to find RLE payload length, err: %d\n", rc);
                     return rc;
                 }
                 rc = ips_write_rle_hunk(output_file, rle_hunk_length, rle_value);
                 if (rc < 0) {
-                    fprintf(stderr, "Failed to write RLE hunk value to output, at hunk: %d, rle length: %d, rle value: %d\n",
-                            hunk_count, rle_hunk_length, rle_value);
+                    rombp_log_err("Failed to write RLE hunk value to output, at hunk: %d, rle length: %d, rle value: %d\n",
+                                  hunk_count, rle_hunk_length, rle_value);
                     return rc;
                 }
             } else {
                 rc = ips_write_hunk(ips_file, output_file, hunk_header.length);
                 if (rc < 0) {
-                    fprintf(stderr, "Failed writing non-RLE hunk value to output, at hunk: %d, length: %d\n",
-                            hunk_count, hunk_header.length);
+                    rombp_log_err("Failed writing non-RLE hunk value to output, at hunk: %d, length: %d\n",
+                                  hunk_count, hunk_header.length);
                     return rc;
                 }
             }

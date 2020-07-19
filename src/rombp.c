@@ -2,6 +2,7 @@
 #include <errno.h>
 
 #include "ips.h"
+#include "log.h"
 #include "ui.h"
 
 static void close_files(FILE* input_file, FILE* output_file, FILE* ips_file) {
@@ -17,31 +18,31 @@ static void close_files(FILE* input_file, FILE* output_file, FILE* ips_file) {
 }
 
 static int patch_file(rombp_patch_command* command) {
-    fprintf(stdout, "Patching file\n");
+    rombp_log_info("Patching file\n");
 
     FILE* input_file = fopen(command->input_file, "r");
     if (input_file == NULL) {
-        fprintf(stderr, "Failed to open input file: %s, errno: %d\n", command->input_file, errno);
+        rombp_log_err("Failed to open input file: %s, errno: %d\n", command->input_file, errno);
         return errno;
     }
 
     FILE* output_file = fopen(command->output_file, "w");
     if (output_file == NULL) {
-        fprintf(stderr, "Failed to open output file: %d\n", errno);
+        rombp_log_err("Failed to open output file: %d\n", errno);
         close_files(input_file, NULL, NULL);
         return errno;
     }
 
     FILE* ips_file = fopen(command->ips_file, "r");
     if (ips_file == NULL) {
-        fprintf(stderr, "Failed to open IPS file: %d\n", errno);
+        rombp_log_err("Failed to open IPS file: %d\n", errno);
         close_files(input_file, output_file, NULL);
         return errno;
     }
 
     int hunk_count = ips_patch(input_file, output_file, ips_file);
     if (hunk_count < 0) {
-        fprintf(stderr, "Failed to copy file: %d\n", hunk_count);
+        rombp_log_err("Failed to copy file: %d\n", hunk_count);
         close_files(input_file, output_file, ips_file);
         return hunk_count;
     }
@@ -49,7 +50,7 @@ static int patch_file(rombp_patch_command* command) {
     close_files(input_file, output_file, ips_file);
     ui_free_command(command);
 
-    fprintf(stdout, "Done patching file, hunk count: %d\n", hunk_count);
+    rombp_log_info("Done patching file, hunk count: %d\n", hunk_count);
     return 0;
 }
 
@@ -63,7 +64,7 @@ int main() {
 
     int rc = ui_start(&ui);
     if (rc != 0) {
-        fprintf(stderr, "Failed to start UI, error code: %d\n", rc);
+        rombp_log_err("Failed to start UI, error code: %d\n", rc);
         return 1;
     }
 
@@ -77,7 +78,7 @@ int main() {
             case EV_PATCH_COMMAND:
                 rc = patch_file(&command);
                 if (rc != 0) {
-                    fprintf(stderr, "Failed to patch file: %d\n", rc);
+                    rombp_log_err("Failed to patch file: %d\n", rc);
                 }
                 break;
             default:
@@ -86,7 +87,7 @@ int main() {
 
         rc = ui_draw(&ui);
         if (rc != 0) {
-            fprintf(stderr, "Failed to draw: %d\n", rc);
+            rombp_log_err("Failed to draw: %d\n", rc);
             return rc;
         }
 

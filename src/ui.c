@@ -1,5 +1,6 @@
 #include <sys/param.h>
 
+#include "log.h"
 #include "ui.h"
 
 static const int MENU_FONT_SIZE = 16;
@@ -9,12 +10,12 @@ static int new_text_texture(rombp_ui* ui, const char* text, SDL_Color color, SDL
                                                      text,
                                                      color);
     if (text_surface == NULL) {
-        fprintf(stderr, "Could not convert text to a surface: %s\n", SDL_GetError());
+        rombp_log_err("Could not convert text to a surface: %s\n", SDL_GetError());
         return -1;
     }
     *texture = SDL_CreateTextureFromSurface(ui->sdl.renderer, text_surface);
     if (*texture == NULL) {
-        fprintf(stderr, "Could not convert text to texture: %s\n", SDL_GetError());
+        rombp_log_err("Could not convert text to texture: %s\n", SDL_GetError());
         return -1;
     }
     SDL_FreeSurface(text_surface);
@@ -60,7 +61,7 @@ static void ui_bottom_bar_free(rombp_ui* ui) {
 static int ui_render_menu_fonts(rombp_ui* ui) {
     ui->namelist_text = calloc(sizeof(SDL_Texture*), ui->namelist_size);
     if (ui->namelist_text == NULL) {
-        fprintf(stderr, "Failed to allocate menu text texture array\n");
+        rombp_log_err("Failed to allocate menu text texture array\n");
         return -1;
     }
 
@@ -73,7 +74,7 @@ static int ui_render_menu_fonts(rombp_ui* ui) {
 
         int rc = new_text_texture(ui, ui->namelist[i]->d_name, type == DT_DIR ? directory_color : file_color, &text_texture);
         if (rc != 0) {
-            fprintf(stderr, "Failed to create bottom bar text: %d\n", rc);
+            rombp_log_err("Failed to create bottom bar text: %d\n", rc);
             return rc;
         }
         ui->namelist_text[i] = text_texture;
@@ -87,7 +88,7 @@ static int ui_scan_directory(rombp_ui* ui) {
     
     int namelist_size = scandir(ui->current_directory, &ui->namelist, NULL, dir_alphasort);
     if (namelist_size == -1) {
-        fprintf(stderr, "Failed to scan directory: %s\n", ui->current_directory);
+        rombp_log_err("Failed to scan directory: %s\n", ui->current_directory);
         return -1;
     }
     ui->namelist_size = namelist_size;
@@ -103,7 +104,7 @@ static char* concat_path(char* parent, char* child) {
 
     char* next_path = malloc(next_size);
     if (next_path == NULL) {
-        fprintf(stderr, "Failed to alloc next childectory path: %s\n", child);
+        rombp_log_err("Failed to alloc next childectory path: %s\n", child);
         return NULL;
     }
     strncpy(next_path, parent, parent_size);
@@ -118,14 +119,14 @@ static int ui_change_directory(rombp_ui* ui, char* dir) {
     if (ui->current_directory == NULL) {
         ui->current_directory = malloc(size);
         if (ui->current_directory == NULL) {
-            fprintf(stderr, "Failed to alloc directory path: %s\n", dir);
+            rombp_log_err("Failed to alloc directory path: %s\n", dir);
             return -1;
         }
         strncpy(ui->current_directory, dir, size);
     } else {
         char* next_directory = concat_path(ui->current_directory, dir);
         if (next_directory == NULL) {
-            fprintf(stderr, "Couldn't get next directory\n");
+            rombp_log_err("Couldn't get next directory\n");
             return -1;
         }
 
@@ -145,12 +146,12 @@ static int ui_setup_bottom_bar(rombp_ui* ui) {
 
     rc = new_text_texture(ui, BOTTOM_BAR_ITEM_1, text_color, &ui->bottom_bar_text_1);
     if (rc != 0) {
-        fprintf(stderr, "Failed to create bottom bar text: %d\n", rc);
+        rombp_log_err("Failed to create bottom bar text: %d\n", rc);
         return rc;
     }
     rc = new_text_texture(ui, BOTTOM_BAR_ITEM_2, text_color, &ui->bottom_bar_text_2);
     if (rc != 0) {
-        fprintf(stderr, "Failed to create bottom bar text: %d\n", rc);
+        rombp_log_err("Failed to create bottom bar text: %d\n", rc);
         return rc;
     }
 
@@ -158,7 +159,7 @@ static int ui_setup_bottom_bar(rombp_ui* ui) {
 }
 
 int ui_start(rombp_ui* ui) {
-    printf("Starting UI\n");
+    rombp_log_info("Starting UI\n");
 
     ui->namelist = NULL;
     ui->namelist_text = NULL;
@@ -172,11 +173,11 @@ int ui_start(rombp_ui* ui) {
     ui->sdl.scaling_factor = 2.0;
     
     if (SDL_Init(SDL_INIT_EVERYTHING) < 0) {
-        fprintf(stderr, "SDL could not initialize! SDL_Error: %s\n", SDL_GetError());
+        rombp_log_err("SDL could not initialize! SDL_Error: %s\n", SDL_GetError());
         return -1;
     }
     if (TTF_Init() < 0) {
-        fprintf(stderr, "SDL could not initialize TTF! TTF_Error: %s\n", TTF_GetError());
+        rombp_log_err("SDL could not initialize TTF! TTF_Error: %s\n", TTF_GetError());
         return -1;
     }
     ui->sdl.window = SDL_CreateWindow("rombp",
@@ -186,41 +187,41 @@ int ui_start(rombp_ui* ui) {
                                    ui->sdl.screen_height * ui->sdl.scaling_factor,
                                    SDL_WINDOW_SHOWN);
     if (ui->sdl.window == NULL) {
-        fprintf(stderr, "Window could not be created! SDL_Error: %s\n", SDL_GetError());
+        rombp_log_err("Window could not be created! SDL_Error: %s\n", SDL_GetError());
         return -1;
     }
 
     ui->sdl.renderer = SDL_CreateRenderer(ui->sdl.window, -1, SDL_RENDERER_ACCELERATED);
     if (ui->sdl.renderer == NULL) {
-        fprintf(stderr, "Could not initialize renderer: SDL_Error: %s\n", SDL_GetError());
+        rombp_log_err("Could not initialize renderer: SDL_Error: %s\n", SDL_GetError());
         return -1;
     }
 
     if (SDL_RenderSetScale(ui->sdl.renderer, ui->sdl.scaling_factor, ui->sdl.scaling_factor) < 0) {
-        fprintf(stderr, "Could not set the renderer scaling: SDL_Error: %s\n", SDL_GetError());
+        rombp_log_err("Could not set the renderer scaling: SDL_Error: %s\n", SDL_GetError());
         return -1;
     }
 
     ui->sdl.menu_font = TTF_OpenFont("assets/fonts/PressStart2P.ttf", MENU_FONT_SIZE);
     if (ui->sdl.menu_font == NULL) {
-        fprintf(stderr, "Failed to load menu font: %s\n", TTF_GetError());
+        rombp_log_err("Failed to load menu font: %s\n", TTF_GetError());
         return -1;
     }
 
     int rc = ui_change_directory(ui, ".");
     if (rc < 0) {
-        fprintf(stderr, "Failed to change directory: %d\n", rc);
+        rombp_log_err("Failed to change directory: %d\n", rc);
         return -1;
     }
     rc = ui_scan_directory(ui);
     if (rc < 0) {
-        fprintf(stderr, "Failed to scan directory, error code: %d\n", rc);
+        rombp_log_err("Failed to scan directory, error code: %d\n", rc);
         return -1;
     }
 
     rc = ui_setup_bottom_bar(ui);
     if (rc < 0) {
-        fprintf(stderr, "Failed to setup bottom bar: %d\n", rc);
+        rombp_log_err("Failed to setup bottom bar: %d\n", rc);
         return -1;
     }
 
@@ -263,7 +264,7 @@ static int replace_extension(char* input, const char* new_ext, char** output) {
     size_t output_length = strlen(input) + strlen(new_ext) + 1;
     char* out = malloc(output_length);
     if (out == NULL) {
-        fprintf(stderr, "Failed to alloc extension replaced output\n");
+        rombp_log_err("Failed to alloc extension replaced output\n");
         return -1;
     }
 
@@ -293,15 +294,15 @@ static int ui_handle_select(rombp_ui* ui, rombp_patch_command* command) {
     int rc;
 
     if (selected_item->d_type == DT_DIR) {
-        printf("Got directory selection\n");
+        rombp_log_info("Got directory selection\n");
         rc = ui_change_directory(ui, selected_item->d_name);
         if (rc != 0) {
-            fprintf(stderr, "Failed to change directory: %s, rc: %d\n",selected_item->d_name, rc);
+            rombp_log_err("Failed to change directory: %s, rc: %d\n",selected_item->d_name, rc);
             return -1;
         }
         return ui_scan_directory(ui);
     } else if (selected_item->d_type == DT_REG) {
-        printf("Got file selection\n");
+        rombp_log_info("Got file selection\n");
         if (command->input_file == NULL) {
             command->input_file = concat_path(ui->current_directory, selected_item->d_name);
             ui->current_screen = SELECT_IPS;
@@ -309,13 +310,13 @@ static int ui_handle_select(rombp_ui* ui, rombp_patch_command* command) {
             command->ips_file = concat_path(ui->current_directory, selected_item->d_name);
             char* copied_output = strdup(command->ips_file);
             if (copied_output == NULL) {
-                fprintf(stderr, "Failed to copy output_path string\n");
+                rombp_log_err("Failed to copy output_path string\n");
                 return -1;
             }
             char* replaced_extension;
             rc = replace_extension(copied_output, ".smc", &replaced_extension);
             if (rc != 0) {
-                fprintf(stderr, "Failed to replace extension for file: %s\n", copied_output);
+                rombp_log_err("Failed to replace extension for file: %s\n", copied_output);
                 free(copied_output);
                 return rc;
             }
@@ -361,7 +362,7 @@ rombp_ui_event ui_handle_event(rombp_ui* ui, rombp_patch_command* command) {
                     case SDLK_y:
                         rc = ui_handle_select(ui, command);
                         if (rc != 0) {
-                            fprintf(stderr, "Failed to handle select event: %d\n", rc);
+                            rombp_log_err("Failed to handle select event: %d\n", rc);
                             return EV_NONE;
                         }
                         if (command->input_file != NULL && command->ips_file != NULL) {
@@ -403,7 +404,7 @@ rombp_ui_event ui_handle_event(rombp_ui* ui, rombp_patch_command* command) {
                         int w = event.window.data1;
                         int h = event.window.data2;
                         ui_resize_window(ui, w, h);
-                        printf("Window size is: %dx%d\n", w, h);
+                        rombp_log_info("Window size is: %dx%d\n", w, h);
                         break;
                     }
                     default:
@@ -438,7 +439,7 @@ static int draw_bottom_bar(rombp_ui* ui) {
             bottom_bar_rect.w = MENU_FONT_SIZE * strlen(BOTTOM_BAR_ITEM_1);
             rc = SDL_RenderCopy(ui->sdl.renderer, ui->bottom_bar_text_1, NULL, &bottom_bar_rect);
             if (rc < 0) {
-                fprintf(stderr, "Failed to render text surface: %s\n", SDL_GetError());
+                rombp_log_err("Failed to render text surface: %s\n", SDL_GetError());
                 return rc;
             }
             break;
@@ -446,7 +447,7 @@ static int draw_bottom_bar(rombp_ui* ui) {
             bottom_bar_rect.w = MENU_FONT_SIZE * strlen(BOTTOM_BAR_ITEM_2);
             rc = SDL_RenderCopy(ui->sdl.renderer, ui->bottom_bar_text_2, NULL, &bottom_bar_rect);
             if (rc < 0) {
-                fprintf(stderr, "Failed to render text surface: %s\n", SDL_GetError());
+                rombp_log_err("Failed to render text surface: %s\n", SDL_GetError());
                 return rc;
             }
             break;
@@ -480,7 +481,7 @@ static int draw_menu(rombp_ui* ui) {
 
         rc = SDL_RenderCopy(ui->sdl.renderer, ui->namelist_text[paging_offset], NULL, &menu_item_rect);
         if (rc < 0) {
-            fprintf(stderr, "Failed to render text surface: %s\n", SDL_GetError());
+            rombp_log_err("Failed to render text surface: %s\n", SDL_GetError());
             return rc;
         }
 
@@ -497,13 +498,13 @@ int ui_draw(rombp_ui* ui) {
 
     rc = draw_menu(ui);
     if (rc != 0) {
-        fprintf(stderr, "Failed to draw menu: %d\n", rc);
+        rombp_log_err("Failed to draw menu: %d\n", rc);
         return rc;
     }
 
     rc = draw_bottom_bar(ui);
     if (rc != 0) {
-        fprintf(stderr, "Failed to draw bottom bar: %d\n", rc);
+        rombp_log_err("Failed to draw bottom bar: %d\n", rc);
         return rc;
     }
 
