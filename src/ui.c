@@ -364,6 +364,33 @@ static int ui_handle_select(rombp_ui* ui, rombp_patch_command* command) {
     return 0;
 }
 
+static void ui_handle_down(rombp_ui* ui, int amount) {
+    int nitems = MIN(MENU_ITEM_COUNT, ui->namelist_size);
+    if (ui->selected_item == (nitems - 1)) {
+        // Don't allow any paging offset if the number of directory items fits on the screen at once. Otherwise,
+        // make the last allowed offset the difference of the two.
+        int max_offset = ui->namelist_size == nitems ? 0 : ui->namelist_size - nitems;
+
+        ui->selected_item = nitems - 1;
+        if (ui->selected_offset != max_offset) {
+            ui->selected_offset++;
+        }
+    } else {
+        ui->selected_item = ui->selected_item + 1;
+    }
+}
+
+static void ui_handle_up(rombp_ui* ui, int amount) {
+    if (ui->selected_item == 0) {
+        ui->selected_item = 0;
+        if (ui->selected_offset != 0) {
+            ui->selected_offset--;
+        }
+    } else {
+        ui->selected_item = ui->selected_item - 1;
+    }
+}
+
 void ui_free_command(rombp_patch_command* command) {
     if (command->input_file != NULL) {
         free(command->input_file);
@@ -384,7 +411,6 @@ rombp_ui_event ui_handle_event(rombp_ui* ui, rombp_patch_command* command) {
     int rc;
 
     while (SDL_PollEvent(&event) != 0) {
-        int nitems = MIN(MENU_ITEM_COUNT, ui->namelist_size);
         switch (event.type) {
             case SDL_KEYDOWN:
                 switch (event.key.keysym.sym) {
@@ -410,28 +436,10 @@ rombp_ui_event ui_handle_event(rombp_ui* ui, rombp_patch_command* command) {
                         }
                         break;
                     case SDLK_DOWN:
-                        if (ui->selected_item == (nitems - 1)) {
-                            // Don't allow any paging offset if the number of directory items fits on the screen at once. Otherwise,
-                            // make the last allowed offset the difference of the two.
-                            int max_offset = ui->namelist_size == nitems ? 0 : ui->namelist_size - nitems;
-
-                            ui->selected_item = nitems - 1;
-                            if (ui->selected_offset != max_offset) {
-                                ui->selected_offset++;
-                            }
-                        } else {
-                            ui->selected_item = ui->selected_item + 1;
-                        }
+                        ui_handle_down(ui, 1);
                         break;
                     case SDLK_UP:
-                        if (ui->selected_item == 0) {
-                            ui->selected_item = 0;
-                            if (ui->selected_offset != 0) {
-                                ui->selected_offset--;
-                            }
-                        } else {
-                            ui->selected_item = ui->selected_item - 1;
-                        }
+                        ui_handle_up(ui, 1);
                         break;
                     default:
                         break;
