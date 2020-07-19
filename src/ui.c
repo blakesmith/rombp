@@ -4,6 +4,23 @@
 
 static const int MENU_FONT_SIZE = 16;
 
+static int new_text_texture(rombp_ui* ui, const char* text, SDL_Color color, SDL_Texture** texture) {
+    SDL_Surface* text_surface = TTF_RenderText_Solid(ui->sdl.menu_font,
+                                                     text,
+                                                     color);
+    if (text_surface == NULL) {
+        fprintf(stderr, "Could not convert text to a surface: %s\n", SDL_GetError());
+        return -1;
+    }
+    *texture = SDL_CreateTextureFromSurface(ui->sdl.renderer, text_surface);
+    if (*texture == NULL) {
+        fprintf(stderr, "Could not convert text to texture: %s\n", SDL_GetError());
+        return -1;
+    }
+    SDL_FreeSurface(text_surface);
+    return 0;
+}
+
 static int dir_alphasort(const struct dirent** a, const struct dirent** b) {
     if ((*a)->d_type == DT_DIR && (*b)->d_type == DT_REG) {
         return -1;
@@ -52,19 +69,13 @@ static int ui_render_menu_fonts(rombp_ui* ui) {
 
     for (int i = 0; i < ui->namelist_size; i++) {
         unsigned char type = ui->namelist[i]->d_type;
-        SDL_Surface* text_surface = TTF_RenderText_Solid(ui->sdl.menu_font,
-                                                         ui->namelist[i]->d_name,
-                                                         type == DT_DIR ? directory_color : file_color);
-        if (text_surface == NULL) {
-            fprintf(stderr, "Could not convert menu text to a surface: %s\n", SDL_GetError());
-            return -1;
+        SDL_Texture *text_texture;
+
+        int rc = new_text_texture(ui, ui->namelist[i]->d_name, type == DT_DIR ? directory_color : file_color, &text_texture);
+        if (rc != 0) {
+            fprintf(stderr, "Failed to create bottom bar text: %d\n", rc);
+            return rc;
         }
-        SDL_Texture* text_texture = SDL_CreateTextureFromSurface(ui->sdl.renderer, text_surface);
-        if (text_texture == NULL) {
-            fprintf(stderr, "Could not convert menu text to texture: %s\n", SDL_GetError());
-            return -1;
-        }
-        SDL_FreeSurface(text_surface);
         ui->namelist_text[i] = text_texture;
     }
 
@@ -122,23 +133,6 @@ static int ui_change_directory(rombp_ui* ui, char* dir) {
         ui->current_directory = next_directory;
     }
 
-    return 0;
-}
-
-static int new_text_texture(rombp_ui* ui, const char* text, SDL_Color color, SDL_Texture** texture) {
-    SDL_Surface* text_surface = TTF_RenderText_Solid(ui->sdl.menu_font,
-                                                     text,
-                                                     color);
-    if (text_surface == NULL) {
-        fprintf(stderr, "Could not convert text to a surface: %s\n", SDL_GetError());
-        return -1;
-    }
-    *texture = SDL_CreateTextureFromSurface(ui->sdl.renderer, text_surface);
-    if (*texture == NULL) {
-        fprintf(stderr, "Could not convert text to texture: %s\n", SDL_GetError());
-        return -1;
-    }
-    SDL_FreeSurface(text_surface);
     return 0;
 }
 
