@@ -19,6 +19,7 @@ typedef struct ips_hunk_header {
     uint16_t length;
 } ips_hunk_header;
 
+int ips_verify_header(FILE* ips_file);
 int ips_patch(FILE* input_file, FILE* outut_file, FILE* ips_file);
 
 #endif

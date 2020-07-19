@@ -57,7 +57,7 @@ static const uint8_t IPS_EXPECTED_HEADER[] = {
 };
 static const size_t IPS_HEADER_SIZE = sizeof(IPS_EXPECTED_HEADER) / sizeof(uint8_t);
 
-static int ips_verify_header(FILE* ips_file) {
+int ips_verify_header(FILE* ips_file) {
     uint8_t buf[IPS_HEADER_SIZE];
 
     size_t nread = fread(&buf, 1, IPS_HEADER_SIZE, ips_file);
@@ -204,17 +204,7 @@ int ips_patch(FILE* input_file, FILE* output_file, FILE* ips_file) {
         return rc;
     }
 
-    // Sanity check that we're looking at an IPS file.
-    rc = ips_verify_header(ips_file);
-    if (rc == IPS_INVALID_HEADER) {
-        rombp_log_err("IPS input file doesn't start with a PATCH header\n");
-        return rc;
-    } else if (rc != 0) {
-        rombp_log_err("Failed to verify IPS header: %d\n", rc);
-        return rc;
-    }
-
-    // Then, iterate through hunks
+    // Then, iterate through IPS hunks
     int hunk_count = 0;
     ips_hunk_header hunk_header;
     while (1) {
