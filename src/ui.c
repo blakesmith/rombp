@@ -31,6 +31,12 @@ static void ui_directory_free(rombp_ui* ui) {
     }
 }
 
+static void ui_bottom_bar_free(rombp_ui* ui) {
+    if (ui->bottom_bar_text != NULL) {
+        SDL_DestroyTexture(ui->bottom_bar_text);
+    }
+}
+
 static int ui_render_menu_fonts(rombp_ui* ui) {
     ui->namelist_text = calloc(sizeof(SDL_Texture*), ui->namelist_size);
     if (ui->namelist_text == NULL) {
@@ -116,6 +122,28 @@ static int ui_change_directory(rombp_ui* ui, char* dir) {
     return 0;
 }
 
+static const char* BOTTOM_BAR_ITEM_1 = "Select original file | Y=select, B=quit";
+
+static int ui_setup_bottom_bar(rombp_ui* ui) {
+    static const SDL_Color text_color = { 0xFF, 0xFF, 0xFF };
+    SDL_Surface* text_surface = TTF_RenderText_Solid(ui->sdl.menu_font,
+                                                     BOTTOM_BAR_ITEM_1,
+                                                     text_color);
+    if (text_surface == NULL) {
+        fprintf(stderr, "Could not convert menu text to a surface: %s\n", SDL_GetError());
+        return -1;
+    }
+    SDL_Texture* text_texture = SDL_CreateTextureFromSurface(ui->sdl.renderer, text_surface);
+    if (text_texture == NULL) {
+        fprintf(stderr, "Could not convert menu text to texture: %s\n", SDL_GetError());
+        return -1;
+    }
+    SDL_FreeSurface(text_surface);
+    ui->bottom_bar_text = text_texture;
+
+    return 0;
+}
+
 int ui_start(rombp_ui* ui) {
     printf("Starting UI\n");
 
@@ -125,8 +153,8 @@ int ui_start(rombp_ui* ui) {
     
     ui->selected_item = 0;
     ui->selected_offset = 0;
-    ui->sdl.screen_width = 320;
-    ui->sdl.screen_height = 240;
+    ui->sdl.screen_width = 640;
+    ui->sdl.screen_height = 480;
     ui->sdl.scaling_factor = 2.0;
     
     if (SDL_Init(SDL_INIT_EVERYTHING) < 0) {
@@ -176,11 +204,18 @@ int ui_start(rombp_ui* ui) {
         return -1;
     }
 
+    rc = ui_setup_bottom_bar(ui);
+    if (rc < 0) {
+        fprintf(stderr, "Failed to setup bottom bar: %d\n", rc);
+        return -1;
+    }
+
     return 0;
 }
 
 void ui_stop(rombp_ui* ui) {
     ui_directory_free(ui);
+    ui_bottom_bar_free(ui);
     if (ui->current_directory != NULL) {
         free(ui->current_directory);
     }
@@ -308,6 +343,7 @@ rombp_ui_event ui_handle_event(rombp_ui* ui, rombp_patch_command* command) {
 }
 
 static int draw_bottom_bar(rombp_ui* ui) {
+    int rc;
     SDL_Rect bottom_bar_rect;
 
     bottom_bar_rect.x = 0;
@@ -317,6 +353,14 @@ static int draw_bottom_bar(rombp_ui* ui) {
 
     SDL_SetRenderDrawColor(ui->sdl.renderer, 0x21, 0x2F, 0x3C, 0xFF);
     SDL_RenderFillRect(ui->sdl.renderer, &bottom_bar_rect);
+
+    bottom_bar_rect.w = MENU_FONT_SIZE * strlen(BOTTOM_BAR_ITEM_1);
+
+    rc = SDL_RenderCopy(ui->sdl.renderer, ui->bottom_bar_text, NULL, &bottom_bar_rect);
+    if (rc < 0) {
+        fprintf(stderr, "Failed to render text surface: %s\n", SDL_GetError());
+        return rc;
+    }
 
     return 0;
 }
