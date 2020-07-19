@@ -28,7 +28,7 @@ typedef struct rombp_sdl {
     TTF_Font* menu_font;
 } rombp_sdl;
 
-#define MENU_ITEM_COUNT 28
+#define MENU_ITEM_COUNT 27
 
 typedef struct rombp_ui {
     rombp_screen current_screen;
@@ -44,6 +44,7 @@ typedef struct rombp_ui {
     SDL_Texture** namelist_text;
     int namelist_size;
 
+    rombp_ui_status_bar bottom_bar;
     rombp_ui_status_bar nav_bar;
 } rombp_ui;
 

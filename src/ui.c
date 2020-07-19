@@ -5,6 +5,11 @@
 
 static const int MENU_FONT_SIZE = 16;
 
+static const char* STATUS_BAR_TEXT_ROM = "Select ROM file | Y=select, B=quit";
+static const char* STATUS_BAR_TEXT_IPS = "Select IPS file | Y=select, B=back";
+
+static const char* BOTTOM_BAR_TEXT = "rombp v0.0.1";
+
 static int new_text_texture(rombp_ui* ui, const char* text, SDL_Color color, SDL_Texture** texture) {
     SDL_Surface* text_surface = TTF_RenderText_Solid(ui->sdl.menu_font,
                                                      text,
@@ -128,9 +133,6 @@ static int ui_change_directory(rombp_ui* ui, char* dir) {
     return 0;
 }
 
-static const char* STATUS_BAR_TEXT_ROM = "Select ROM file | Y=select, B=quit";
-static const char* STATUS_BAR_TEXT_IPS = "Select IPS file | Y=select, B=back";
-
 static int ui_setup_status_bar(rombp_ui* ui, rombp_ui_status_bar *status_bar) {
     int rc;
 
@@ -224,12 +226,30 @@ int ui_start(rombp_ui* ui) {
     ui->nav_bar.background_color = (SDL_Color){ 0x21, 0x2F, 0x3C };
     ui->nav_bar.position = (SDL_Rect){
         .x = 0,
+        .y = 0,
+        .h = MENU_FONT_SIZE,
+        .w = ui->sdl.screen_width
+    };
+
+    rc = ui_setup_status_bar(ui, &ui->nav_bar);
+    if (rc < 0) {
+        rombp_log_err("Failed to setup bottom bar: %d\n", rc);
+        return -1;
+    }
+
+    ui->bottom_bar.text = BOTTOM_BAR_TEXT;
+    ui->bottom_bar.text_len = strlen(BOTTOM_BAR_TEXT);
+    ui->bottom_bar.text_texture = NULL;
+    ui->bottom_bar.text_color = (SDL_Color){ 0xFF, 0xFF, 0xFF };
+    ui->bottom_bar.background_color = (SDL_Color){ 0x21, 0x2F, 0x3C };
+    ui->bottom_bar.position = (SDL_Rect){
+        .x = 0,
         .y = ui->sdl.screen_height - MENU_FONT_SIZE,
         .h = MENU_FONT_SIZE,
         .w = ui->sdl.screen_width
     };
-        
-    rc = ui_setup_status_bar(ui, &ui->nav_bar);
+
+    rc = ui_setup_status_bar(ui, &ui->bottom_bar);
     if (rc < 0) {
         rombp_log_err("Failed to setup bottom bar: %d\n", rc);
         return -1;
@@ -241,6 +261,7 @@ int ui_start(rombp_ui* ui) {
 void ui_stop(rombp_ui* ui) {
     ui_directory_free(ui);
     ui_status_bar_free(&ui->nav_bar);
+    ui_status_bar_free(&ui->bottom_bar);
     if (ui->current_directory != NULL) {
         free(ui->current_directory);
     }
@@ -465,7 +486,7 @@ static int draw_status_bar(rombp_ui* ui, rombp_ui_status_bar* status_bar) {
 
 static int draw_menu(rombp_ui* ui) {
     static const int menu_padding_left_right = 15;
-    static const int menu_padding_top_bottom = 5;
+    static const int menu_padding_top_bottom = 26;
 
     int rc;
     SDL_Rect menu_item_rect;
@@ -511,7 +532,13 @@ int ui_draw(rombp_ui* ui) {
 
     rc = draw_status_bar(ui, &ui->nav_bar);
     if (rc != 0) {
-        rombp_log_err("Failed to draw bottom bar: %d\n", rc);
+        rombp_log_err("Failed to draw nav bar: %d\n", rc);
+        return rc;
+    }
+
+    rc = draw_status_bar(ui, &ui->bottom_bar);
+    if (rc != 0) {
+        rombp_log_err("Failed to draw header bar: %d\n", rc);
         return rc;
     }
 
