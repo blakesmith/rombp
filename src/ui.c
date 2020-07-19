@@ -307,6 +307,20 @@ rombp_ui_event ui_handle_event(rombp_ui* ui, rombp_patch_command* command) {
     return EV_NONE;
 }
 
+static int draw_bottom_bar(rombp_ui* ui) {
+    SDL_Rect bottom_bar_rect;
+
+    bottom_bar_rect.x = 0;
+    bottom_bar_rect.y = ui->sdl.screen_height - MENU_FONT_SIZE;
+    bottom_bar_rect.h = MENU_FONT_SIZE;
+    bottom_bar_rect.w = ui->sdl.screen_width;
+
+    SDL_SetRenderDrawColor(ui->sdl.renderer, 0x21, 0x2F, 0x3C, 0xFF);
+    SDL_RenderFillRect(ui->sdl.renderer, &bottom_bar_rect);
+
+    return 0;
+}
+
 static int draw_menu(rombp_ui* ui) {
     static const int menu_padding_left_right = 15;
     static const int menu_padding_top_bottom = 5;
@@ -350,6 +364,12 @@ int ui_draw(rombp_ui* ui) {
     rc = draw_menu(ui);
     if (rc != 0) {
         fprintf(stderr, "Failed to draw menu: %d\n", rc);
+        return rc;
+    }
+
+    rc = draw_bottom_bar(ui);
+    if (rc != 0) {
+        fprintf(stderr, "Failed to draw bottom bar: %d\n", rc);
         return rc;
     }
 
