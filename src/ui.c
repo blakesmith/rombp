@@ -259,24 +259,6 @@ static rombp_ui_event ui_handle_back(rombp_ui* ui, rombp_patch_command* command)
     return EV_NONE;
 }
 
-static int do_replace_ext(char* input, const char* new_ext) {
-    char *end = input + strlen(input);
-
-    // First, find the location of the last dot, before the extension name.
-    while (end > input && *end != '.' && *end != '\\' && *end != '/') {
-        --end;
-    }
-    if ((end > input && *end == '.') &&
-        (*(end - 1) != '\\' && *(end - 1) != '/')) {
-        // Where we would normally add a NULL terminating
-        // byte, replace the extension.
-        strncpy(end, new_ext, strlen(new_ext) + 1);
-        return 0;
-    } else {
-        return -1;
-    }
-}
-
 static int replace_extension(char* input, const char* new_ext, char** output) {
     size_t output_length = strlen(input) + strlen(new_ext) + 1;
     char* out = malloc(output_length);
