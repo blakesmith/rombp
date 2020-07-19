@@ -17,6 +17,9 @@ typedef struct rombp_sdl {
     SDL_Window* window;
     SDL_Renderer* renderer;
     TTF_Font* menu_font;
+
+    SDL_Texture* status_bar_text_rom;
+    SDL_Texture* status_bar_text_ips;
 } rombp_sdl;
 
 #define MENU_ITEM_COUNT 28
@@ -34,9 +37,6 @@ typedef struct rombp_ui {
     struct dirent** namelist;
     SDL_Texture** namelist_text;
     int namelist_size;
-
-    SDL_Texture* bottom_bar_text_1;
-    SDL_Texture* bottom_bar_text_2;
 } rombp_ui;
 
 typedef enum rombp_ui_event {
