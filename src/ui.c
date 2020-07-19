@@ -259,6 +259,53 @@ static rombp_ui_event ui_handle_back(rombp_ui* ui, rombp_patch_command* command)
     return EV_NONE;
 }
 
+static int do_replace_ext(char* input, const char* new_ext) {
+    char *end = input + strlen(input);
+
+    // First, find the location of the last dot, before the extension name.
+    while (end > input && *end != '.' && *end != '\\' && *end != '/') {
+        --end;
+    }
+    if ((end > input && *end == '.') &&
+        (*(end - 1) != '\\' && *(end - 1) != '/')) {
+        // Where we would normally add a NULL terminating
+        // byte, replace the extension.
+        strncpy(end, new_ext, strlen(new_ext) + 1);
+        return 0;
+    } else {
+        return -1;
+    }
+}
+
+static int replace_extension(char* input, const char* new_ext, char** output) {
+    size_t output_length = strlen(input) + strlen(new_ext) + 1;
+    char* out = malloc(output_length);
+    if (out == NULL) {
+        fprintf(stderr, "Failed to alloc extension replaced output\n");
+        return -1;
+    }
+
+    strncpy(out, input, output_length);
+    // First, jump to the end of the string
+    char *end = out + strlen(out);
+
+    // Then, find the location of the last dot, before the extension name.
+    while (end > out && *end != '.' && *end != '\\' && *end != '/') {
+        --end;
+    }
+
+    if ((end > out && *end == '.') &&
+        (*(end - 1) != '\\' && *(end - 1) != '/')) {
+        // Where we would normally add a NULL terminating
+        // byte, replace the extension.
+        strncpy(end, new_ext, strlen(new_ext) + 1);
+        *output = out;
+        return 0;
+    } else {
+        return -1;
+    }
+}
+
 static int ui_handle_select(rombp_ui* ui, rombp_patch_command* command) {
     struct dirent* selected_item = ui->namelist[ui->selected_item + ui->selected_offset];
     int rc;
@@ -278,7 +325,21 @@ static int ui_handle_select(rombp_ui* ui, rombp_patch_command* command) {
             ui->current_screen = SELECT_IPS;
         } else if (command->ips_file == NULL) {
             command->ips_file = concat_path(ui->current_directory, selected_item->d_name);
-            command->output_file = concat_path(ui->current_directory, "PATCHED.smc");
+            char* copied_output = strdup(command->ips_file);
+            if (copied_output == NULL) {
+                fprintf(stderr, "Failed to copy output_path string\n");
+                return -1;
+            }
+            char* replaced_extension;
+            rc = replace_extension(copied_output, ".smc", &replaced_extension);
+            if (rc != 0) {
+                fprintf(stderr, "Failed to replace extension for file: %s\n", copied_output);
+                free(copied_output);
+                return rc;
+            }
+
+            command->output_file = replaced_extension;
+            free(copied_output);
         }
     }
 
