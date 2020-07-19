@@ -339,7 +339,9 @@ rombp_ui_event ui_handle_event(rombp_ui* ui, rombp_patch_command* command) {
                             int max_offset = ui->namelist_size == nitems ? 0 : ui->namelist_size - nitems;
 
                             ui->selected_item = nitems - 1;
-                            ui->selected_offset = ui->selected_offset == max_offset ? max_offset : ui->selected_offset + 1;
+                            if (ui->selected_offset != max_offset) {
+                                ui->selected_offset++;
+                            }
                         } else {
                             ui->selected_item = ui->selected_item + 1;
                         }
@@ -347,7 +349,9 @@ rombp_ui_event ui_handle_event(rombp_ui* ui, rombp_patch_command* command) {
                     case SDLK_UP:
                         if (ui->selected_item == 0) {
                             ui->selected_item = 0;
-                            ui->selected_offset = ui->selected_offset == 0 ? 0 : ui->selected_offset - 1;
+                            if (ui->selected_offset != 0) {
+                                ui->selected_offset--;
+                            }
                         } else {
                             ui->selected_item = ui->selected_item - 1;
                         }
