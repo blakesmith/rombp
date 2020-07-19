@@ -49,7 +49,7 @@ static void ui_directory_free(rombp_ui* ui) {
     }
 }
 
-static void ui_bottom_bar_free(rombp_ui* ui) {
+static void ui_status_bar_free(rombp_ui* ui) {
     if (ui->sdl.status_bar_text_rom != NULL) {
         SDL_DestroyTexture(ui->sdl.status_bar_text_rom);
     }
@@ -140,7 +140,7 @@ static int ui_change_directory(rombp_ui* ui, char* dir) {
 static const char* STATUS_BAR_TEXT_ROM = "Select ROM file | Y=select, B=quit";
 static const char* STATUS_BAR_TEXT_IPS = "Select IPS file | Y=select, B=back";
 
-static int ui_setup_bottom_bar(rombp_ui* ui) {
+static int ui_setup_status_bar(rombp_ui* ui) {
     static const SDL_Color text_color = { 0xFF, 0xFF, 0xFF };
     int rc;
 
@@ -219,7 +219,7 @@ int ui_start(rombp_ui* ui) {
         return -1;
     }
 
-    rc = ui_setup_bottom_bar(ui);
+    rc = ui_setup_status_bar(ui);
     if (rc < 0) {
         rombp_log_err("Failed to setup bottom bar: %d\n", rc);
         return -1;
@@ -230,7 +230,7 @@ int ui_start(rombp_ui* ui) {
 
 void ui_stop(rombp_ui* ui) {
     ui_directory_free(ui);
-    ui_bottom_bar_free(ui);
+    ui_status_bar_free(ui);
     if (ui->current_directory != NULL) {
         free(ui->current_directory);
     }

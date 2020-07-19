@@ -10,6 +10,14 @@ typedef enum rombp_screen {
     SELECT_IPS = 1,
 } rombp_screen;
 
+typedef struct rombp_ui_status_bar {
+    char* text;
+    size_t text_len;
+    SDL_Texture* text_texture;
+    SDL_Color color;
+    SDL_Rect position;
+} rombup_ui_status_bar;
+
 typedef struct rombp_sdl {
     int screen_width;
     int screen_height;
