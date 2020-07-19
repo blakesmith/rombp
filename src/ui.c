@@ -366,28 +366,26 @@ static int ui_handle_select(rombp_ui* ui, rombp_patch_command* command) {
 
 static void ui_handle_down(rombp_ui* ui, int amount) {
     int nitems = MIN(MENU_ITEM_COUNT, ui->namelist_size);
-    if (ui->selected_item == (nitems - 1)) {
-        // Don't allow any paging offset if the number of directory items fits on the screen at once. Otherwise,
-        // make the last allowed offset the difference of the two.
-        int max_offset = ui->namelist_size == nitems ? 0 : ui->namelist_size - nitems;
+    // Don't allow any paging offset if the number of directory items fits on the screen at once. Otherwise,
+    // make the last allowed offset the difference of the two.
+    int max_offset = ui->namelist_size == nitems ? 0 : ui->namelist_size - nitems;
 
-        ui->selected_item = nitems - 1;
-        if (ui->selected_offset != max_offset) {
-            ui->selected_offset++;
+    if (ui->selected_item == (nitems - 1)) {
+        if (ui->selected_offset <= max_offset) {
+            ui->selected_offset = MIN(max_offset, ui->selected_offset + amount);
         }
     } else {
-        ui->selected_item = ui->selected_item + 1;
+        ui->selected_item = MIN((nitems - 1), ui->selected_item + amount);
     }
 }
 
 static void ui_handle_up(rombp_ui* ui, int amount) {
     if (ui->selected_item == 0) {
-        ui->selected_item = 0;
         if (ui->selected_offset != 0) {
-            ui->selected_offset--;
+            ui->selected_offset = ui->selected_offset - MIN(ui->selected_offset, amount);
         }
     } else {
-        ui->selected_item = ui->selected_item - 1;
+        ui->selected_item = ui->selected_item - MIN(ui->selected_item, amount);
     }
 }
 
@@ -435,8 +433,14 @@ rombp_ui_event ui_handle_event(rombp_ui* ui, rombp_patch_command* command) {
                             return EV_PATCH_COMMAND;
                         }
                         break;
+                    case SDLK_RIGHT:
+                        ui_handle_down(ui, 10);
+                        break;
                     case SDLK_DOWN:
                         ui_handle_down(ui, 1);
+                        break;
+                    case SDLK_LEFT:
+                        ui_handle_up(ui, 10);
                         break;
                     case SDLK_UP:
                         ui_handle_up(ui, 1);
