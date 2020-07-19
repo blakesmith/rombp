@@ -49,15 +49,6 @@ static void ui_directory_free(rombp_ui* ui) {
     }
 }
 
-static void ui_status_bar_free(rombp_ui* ui) {
-    if (ui->sdl.status_bar_text_rom != NULL) {
-        SDL_DestroyTexture(ui->sdl.status_bar_text_rom);
-    }
-    if (ui->sdl.status_bar_text_ips != NULL) {
-        SDL_DestroyTexture(ui->sdl.status_bar_text_ips);
-    }
-}
-
 static int ui_render_menu_fonts(rombp_ui* ui) {
     ui->namelist_text = calloc(sizeof(SDL_Texture*), ui->namelist_size);
     if (ui->namelist_text == NULL) {
@@ -140,22 +131,29 @@ static int ui_change_directory(rombp_ui* ui, char* dir) {
 static const char* STATUS_BAR_TEXT_ROM = "Select ROM file | Y=select, B=quit";
 static const char* STATUS_BAR_TEXT_IPS = "Select IPS file | Y=select, B=back";
 
-static int ui_setup_status_bar(rombp_ui* ui) {
-    static const SDL_Color text_color = { 0xFF, 0xFF, 0xFF };
+static int ui_setup_status_bar(rombp_ui* ui, rombp_ui_status_bar *status_bar) {
     int rc;
 
-    rc = new_text_texture(ui, STATUS_BAR_TEXT_ROM, text_color, &ui->sdl.status_bar_text_rom);
-    if (rc != 0) {
-        rombp_log_err("Failed to create bottom bar text: %d\n", rc);
-        return rc;
-    }
-    rc = new_text_texture(ui, STATUS_BAR_TEXT_IPS, text_color, &ui->sdl.status_bar_text_ips);
+    rc = new_text_texture(ui, status_bar->text, status_bar->text_color, &status_bar->text_texture);
     if (rc != 0) {
         rombp_log_err("Failed to create bottom bar text: %d\n", rc);
         return rc;
     }
 
     return 0;
+}
+
+static void ui_status_bar_free(rombp_ui_status_bar* status_bar) {
+    if (status_bar->text_texture != NULL) {
+        SDL_DestroyTexture(status_bar->text_texture);
+    }
+}
+
+static int ui_status_bar_reset_text(rombp_ui* ui, rombp_ui_status_bar* status_bar, const char* text) {
+    ui_status_bar_free(status_bar);
+    status_bar->text = text;
+    status_bar->text_len = strlen(text);
+    return ui_setup_status_bar(ui, status_bar);
 }
 
 int ui_start(rombp_ui* ui) {
@@ -219,7 +217,19 @@ int ui_start(rombp_ui* ui) {
         return -1;
     }
 
-    rc = ui_setup_status_bar(ui);
+    ui->nav_bar.text = STATUS_BAR_TEXT_ROM;
+    ui->nav_bar.text_len = strlen(STATUS_BAR_TEXT_ROM);
+    ui->nav_bar.text_texture = NULL;
+    ui->nav_bar.text_color = (SDL_Color){ 0xFF, 0xFF, 0xFF };
+    ui->nav_bar.background_color = (SDL_Color){ 0x21, 0x2F, 0x3C };
+    ui->nav_bar.position = (SDL_Rect){
+        .x = 0,
+        .y = ui->sdl.screen_height - MENU_FONT_SIZE,
+        .h = MENU_FONT_SIZE,
+        .w = ui->sdl.screen_width
+    };
+        
+    rc = ui_setup_status_bar(ui, &ui->nav_bar);
     if (rc < 0) {
         rombp_log_err("Failed to setup bottom bar: %d\n", rc);
         return -1;
@@ -230,7 +240,7 @@ int ui_start(rombp_ui* ui) {
 
 void ui_stop(rombp_ui* ui) {
     ui_directory_free(ui);
-    ui_status_bar_free(ui);
+    ui_status_bar_free(&ui->nav_bar);
     if (ui->current_directory != NULL) {
         free(ui->current_directory);
     }
@@ -306,6 +316,10 @@ static int ui_handle_select(rombp_ui* ui, rombp_patch_command* command) {
         if (command->input_file == NULL) {
             command->input_file = concat_path(ui->current_directory, selected_item->d_name);
             ui->current_screen = SELECT_IPS;
+            rc = ui_status_bar_reset_text(ui, &ui->nav_bar, STATUS_BAR_TEXT_IPS);
+            if (rc != 0) {
+                rombp_log_err("Failed to reset status bar text to IPS: %d\n", rc);
+            }
         } else if (command->ips_file == NULL) {
             command->ips_file = concat_path(ui->current_directory, selected_item->d_name);
             char* copied_output = strdup(command->ips_file);
@@ -367,6 +381,10 @@ rombp_ui_event ui_handle_event(rombp_ui* ui, rombp_patch_command* command) {
                         }
                         if (command->input_file != NULL && command->ips_file != NULL) {
                             ui->current_screen = SELECT_ROM;
+                            rc = ui_status_bar_reset_text(ui, &ui->nav_bar, STATUS_BAR_TEXT_ROM);
+                            if (rc != 0) {
+                                rombp_log_err("Failed to reset status bar text");
+                            }
                             return EV_PATCH_COMMAND;
                         }
                         break;
@@ -422,35 +440,24 @@ rombp_ui_event ui_handle_event(rombp_ui* ui, rombp_patch_command* command) {
     return EV_NONE;
 }
 
-static int draw_status_bar(rombp_ui* ui) {
+static int draw_status_bar(rombp_ui* ui, rombp_ui_status_bar* status_bar) {
     int rc;
-    SDL_Rect status_bar_rect;
 
-    status_bar_rect.x = 0;
-    status_bar_rect.y = ui->sdl.screen_height - MENU_FONT_SIZE;
-    status_bar_rect.h = MENU_FONT_SIZE;
-    status_bar_rect.w = ui->sdl.screen_width;
+    SDL_SetRenderDrawColor(ui->sdl.renderer,
+                           status_bar->background_color.r,
+                           status_bar->background_color.g,
+                           status_bar->background_color.b,
+                           0xFF);
+    SDL_RenderFillRect(ui->sdl.renderer, &status_bar->position);
 
-    SDL_SetRenderDrawColor(ui->sdl.renderer, 0x21, 0x2F, 0x3C, 0xFF);
-    SDL_RenderFillRect(ui->sdl.renderer, &status_bar_rect);
+    // Make a copy of position
+    SDL_Rect text_rect = status_bar->position;
+    text_rect.w = MENU_FONT_SIZE * status_bar->text_len;
 
-    switch (ui->current_screen) {
-        case SELECT_ROM:
-            status_bar_rect.w = MENU_FONT_SIZE * strlen(STATUS_BAR_TEXT_ROM);
-            rc = SDL_RenderCopy(ui->sdl.renderer, ui->sdl.status_bar_text_rom, NULL, &status_bar_rect);
-            if (rc < 0) {
-                rombp_log_err("Failed to render text surface: %s\n", SDL_GetError());
-                return rc;
-            }
-            break;
-        case SELECT_IPS:
-            status_bar_rect.w = MENU_FONT_SIZE * strlen(STATUS_BAR_TEXT_IPS);
-            rc = SDL_RenderCopy(ui->sdl.renderer, ui->sdl.status_bar_text_ips, NULL, &status_bar_rect);
-            if (rc < 0) {
-                rombp_log_err("Failed to render text surface: %s\n", SDL_GetError());
-                return rc;
-            }
-            break;
+    rc = SDL_RenderCopy(ui->sdl.renderer, status_bar->text_texture, NULL, &text_rect);
+    if (rc < 0) {
+        rombp_log_err("Failed to render text surface: %s\n", SDL_GetError());
+        return rc;
     }
 
     return 0;
@@ -502,7 +509,7 @@ int ui_draw(rombp_ui* ui) {
         return rc;
     }
 
-    rc = draw_status_bar(ui);
+    rc = draw_status_bar(ui, &ui->nav_bar);
     if (rc != 0) {
         rombp_log_err("Failed to draw bottom bar: %d\n", rc);
         return rc;

@@ -11,12 +11,13 @@ typedef enum rombp_screen {
 } rombp_screen;
 
 typedef struct rombp_ui_status_bar {
-    char* text;
+    const char* text;
     size_t text_len;
     SDL_Texture* text_texture;
-    SDL_Color color;
+    SDL_Color text_color;
+    SDL_Color background_color;
     SDL_Rect position;
-} rombup_ui_status_bar;
+} rombp_ui_status_bar;
 
 typedef struct rombp_sdl {
     int screen_width;
@@ -25,9 +26,6 @@ typedef struct rombp_sdl {
     SDL_Window* window;
     SDL_Renderer* renderer;
     TTF_Font* menu_font;
-
-    SDL_Texture* status_bar_text_rom;
-    SDL_Texture* status_bar_text_ips;
 } rombp_sdl;
 
 #define MENU_ITEM_COUNT 28
@@ -45,6 +43,8 @@ typedef struct rombp_ui {
     struct dirent** namelist;
     SDL_Texture** namelist_text;
     int namelist_size;
+
+    rombp_ui_status_bar nav_bar;
 } rombp_ui;
 
 typedef enum rombp_ui_event {
