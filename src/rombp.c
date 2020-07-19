@@ -111,6 +111,13 @@ int main() {
                     rombp_log_err("Invalid patch type\n");
                 } else if (err == ERR_FILE_IO) {
                     rombp_log_err("Failed to patch file, io error: %d\n", rc);
+                } else {
+                    static const char *success_message = "Success! Wrote %d hunks";
+                    char tmp_buf[255];
+                    int hunk_count = err;
+
+                    sprintf(tmp_buf, success_message, hunk_count);
+                    ui_status_bar_reset_text(&ui, &ui.bottom_bar, tmp_buf);
                 }
                 break;
             default:
