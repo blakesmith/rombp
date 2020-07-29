@@ -4,9 +4,9 @@
 #include "ui.h"
 
 #ifdef TARGET_RG350
-#define MENU_FONT_SIZE 12
-#define SCREEN_WIDTH 640
-#define SCREEN_HEIGHT 480
+#define MENU_FONT_SIZE 16
+#define SCREEN_WIDTH 320
+#define SCREEN_HEIGHT 240
 #define SCALING_FACTOR 1.0
 #define WINDOW_SETTING SDL_WINDOW_FULLSCREEN_DESKTOP
 #else
@@ -22,8 +22,8 @@ static const int menu_padding_top_bottom = 26;
 
 static const int MENU_ITEM_COUNT = (SCREEN_HEIGHT / MENU_FONT_SIZE) - 3;
 
-static const char* STATUS_BAR_TEXT_ROM = "Select ROM file | Y=select, B=quit";
-static const char* STATUS_BAR_TEXT_IPS = "Select IPS file | Y=select, B=back";
+static const char* STATUS_BAR_TEXT_ROM = "Select ROM file | A=select, B=quit";
+static const char* STATUS_BAR_TEXT_IPS = "Select IPS file | A=select, B=back";
 
 static const char* BOTTOM_BAR_TEXT = "rombp v0.0.1";
 
@@ -443,7 +443,7 @@ rombp_ui_event ui_handle_event(rombp_ui* ui, rombp_patch_command* command) {
                         return ui_handle_back(ui, command);
                     case SDLK_RETURN:
                     case SDLK_y:
-                    case SDLK_SPACE: // Y button on RG350
+                    case SDLK_LCTRL: // A button on RG350
                         rc = ui_handle_select(ui, command);
                         if (rc != 0) {
                             rombp_log_err("Failed to handle select event: %d\n", rc);
