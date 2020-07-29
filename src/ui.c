@@ -4,31 +4,43 @@
 #include "ui.h"
 
 #ifdef TARGET_RG350
-#define MENU_FONT_SIZE 16
+#define MENU_FONT_SIZE 18
 #define SCREEN_WIDTH 320
 #define SCREEN_HEIGHT 240
 #define SCALING_FACTOR 1.0
 #define WINDOW_SETTING SDL_WINDOW_FULLSCREEN_DESKTOP
+#define MENU_ITEM_COUNT 11
 #else
-#define MENU_FONT_SIZE 24
+#define MENU_FONT_SIZE 36
 #define SCREEN_WIDTH 1280
 #define SCREEN_HEIGHT 960
 #define SCALING_FACTOR 1.0
 #define WINDOW_SETTING SDL_WINDOW_SHOWN
+#define MENU_ITEM_COUNT 24
 #endif
 
 static const int menu_padding_left_right = 15;
-static const int menu_padding_top_bottom = 26;
-
-static const int MENU_ITEM_COUNT = (SCREEN_HEIGHT / MENU_FONT_SIZE) - 3;
+static const int menu_padding_top_bottom = 25;
 
 static const char* STATUS_BAR_TEXT_ROM = "Select ROM file | A=select, B=quit";
 static const char* STATUS_BAR_TEXT_IPS = "Select IPS file | A=select, B=back";
 
 static const char* BOTTOM_BAR_TEXT = "rombp v0.0.1";
 
+static inline int get_texture_width(SDL_Texture* texture) {
+    int width;
+    SDL_QueryTexture(texture, NULL, NULL, &width, NULL);
+    return width;
+}
+
+static inline int get_texture_height(SDL_Texture* texture) {
+    int height;
+    SDL_QueryTexture(texture, NULL, NULL, NULL, &height);
+    return height;
+}
+
 static int new_text_texture(rombp_ui* ui, const char* text, SDL_Color color, SDL_Texture** texture) {
-    SDL_Surface* text_surface = TTF_RenderText_Solid(ui->sdl.menu_font,
+    SDL_Surface* text_surface = TTF_RenderUTF8_Blended(ui->sdl.menu_font,
                                                      text,
                                                      color);
     if (text_surface == NULL) {
@@ -158,6 +170,7 @@ static int ui_setup_status_bar(rombp_ui* ui, rombp_ui_status_bar *status_bar) {
         rombp_log_err("Failed to create bottom bar text: %d\n", rc);
         return rc;
     }
+    status_bar->position.h = get_texture_height(status_bar->text_texture);
 
     return 0;
 }
@@ -220,7 +233,7 @@ int ui_start(rombp_ui* ui) {
         return -1;
     }
 
-    ui->sdl.menu_font = TTF_OpenFont("assets/fonts/PressStart2P.ttf", MENU_FONT_SIZE);
+    ui->sdl.menu_font = TTF_OpenFont("assets/fonts/ProggySmall.ttf", MENU_FONT_SIZE);
     if (ui->sdl.menu_font == NULL) {
         rombp_log_err("Failed to load menu font: %s\n", TTF_GetError());
         return -1;
@@ -514,7 +527,7 @@ static int draw_status_bar(rombp_ui* ui, rombp_ui_status_bar* status_bar) {
 
     // Make a copy of position
     SDL_Rect text_rect = status_bar->position;
-    text_rect.w = MENU_FONT_SIZE * status_bar->text_len;
+    text_rect.w = get_texture_width(status_bar->text_texture);
 
     rc = SDL_RenderCopy(ui->sdl.renderer, status_bar->text_texture, NULL, &text_rect);
     if (rc < 0) {
@@ -531,10 +544,11 @@ static int draw_menu(rombp_ui* ui) {
 
     int nitems = MIN(MENU_ITEM_COUNT, ui->namelist_size);
     for (int i = 0; i < nitems; i++) {
+        size_t paging_offset = ui->selected_offset + i;
+
         menu_item_rect.x = menu_padding_left_right;
         menu_item_rect.y = (i * MENU_FONT_SIZE) + menu_padding_top_bottom;
-        menu_item_rect.h = MENU_FONT_SIZE;
-
+        menu_item_rect.h = get_texture_height(ui->namelist_text[paging_offset]);
 
         if (i == ui->selected_item) {
             menu_item_rect.w = ui->sdl.screen_width - menu_padding_left_right;
@@ -542,8 +556,7 @@ static int draw_menu(rombp_ui* ui) {
             SDL_RenderFillRect(ui->sdl.renderer, &menu_item_rect);
         }
 
-        size_t paging_offset = ui->selected_offset + i;
-        menu_item_rect.w = MENU_FONT_SIZE * strlen(ui->namelist[paging_offset]->d_name);
+        menu_item_rect.w = get_texture_width(ui->namelist_text[paging_offset]);
 
         rc = SDL_RenderCopy(ui->sdl.renderer, ui->namelist_text[paging_offset], NULL, &menu_item_rect);
         if (rc < 0) {
