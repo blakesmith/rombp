@@ -3,7 +3,24 @@
 #include "log.h"
 #include "ui.h"
 
-static const int MENU_FONT_SIZE = 16;
+#ifdef TARGET_RG350
+#define MENU_FONT_SIZE 12
+#define SCREEN_WIDTH 640
+#define SCREEN_HEIGHT 480
+#define SCALING_FACTOR 1.0
+#define WINDOW_SETTING SDL_WINDOW_FULLSCREEN_DESKTOP
+#else
+#define MENU_FONT_SIZE 24
+#define SCREEN_WIDTH 1280
+#define SCREEN_HEIGHT 960
+#define SCALING_FACTOR 1.0
+#define WINDOW_SETTING SDL_WINDOW_SHOWN
+#endif
+
+static const int menu_padding_left_right = 15;
+static const int menu_padding_top_bottom = 26;
+
+static const int MENU_ITEM_COUNT = (SCREEN_HEIGHT / MENU_FONT_SIZE) - 3;
 
 static const char* STATUS_BAR_TEXT_ROM = "Select ROM file | Y=select, B=quit";
 static const char* STATUS_BAR_TEXT_IPS = "Select IPS file | Y=select, B=back";
@@ -169,9 +186,9 @@ int ui_start(rombp_ui* ui) {
     ui->current_screen = SELECT_ROM;
     ui->selected_item = 0;
     ui->selected_offset = 0;
-    ui->sdl.screen_width = 640;
-    ui->sdl.screen_height = 480;
-    ui->sdl.scaling_factor = 2.0;
+    ui->sdl.screen_width = SCREEN_WIDTH;
+    ui->sdl.screen_height = SCREEN_HEIGHT;
+    ui->sdl.scaling_factor = SCALING_FACTOR;
     
     if (SDL_Init(SDL_INIT_EVERYTHING) < 0) {
         rombp_log_err("SDL could not initialize! SDL_Error: %s\n", SDL_GetError());
@@ -186,7 +203,7 @@ int ui_start(rombp_ui* ui) {
                                    SDL_WINDOWPOS_UNDEFINED,
                                    ui->sdl.screen_width * ui->sdl.scaling_factor,
                                    ui->sdl.screen_height * ui->sdl.scaling_factor,
-                                   SDL_WINDOW_SHOWN);
+                                   WINDOW_SETTING);
     if (ui->sdl.window == NULL) {
         rombp_log_err("Window could not be created! SDL_Error: %s\n", SDL_GetError());
         return -1;
@@ -422,9 +439,11 @@ rombp_ui_event ui_handle_event(rombp_ui* ui, rombp_patch_command* command) {
                     case SDLK_q:
                         return EV_QUIT;
                     case SDLK_b:
+                    case SDLK_LALT: // B button on RG350
                         return ui_handle_back(ui, command);
                     case SDLK_RETURN:
                     case SDLK_y:
+                    case SDLK_SPACE: // Y button on RG350
                         rc = ui_handle_select(ui, command);
                         if (rc != 0) {
                             rombp_log_err("Failed to handle select event: %d\n", rc);
@@ -507,9 +526,6 @@ static int draw_status_bar(rombp_ui* ui, rombp_ui_status_bar* status_bar) {
 }
 
 static int draw_menu(rombp_ui* ui) {
-    static const int menu_padding_left_right = 15;
-    static const int menu_padding_top_bottom = 26;
-
     int rc;
     SDL_Rect menu_item_rect;
 

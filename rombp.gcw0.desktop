@@ -5,6 +5,4 @@ Comment=ROM IPS bin patcher
 Exec=./rombp %f
 Icon=icon
 Terminal=false
-Categories=emulators;
-X-OD-NeedsDownscaling=false
-MimeType=application/x-cue;text/file;
+Categories=applcations;

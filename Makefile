@@ -1,18 +1,21 @@
+CFLAGS=-Wall -Isrc
+LDFLAGS=-lSDL2 -lSDL2_ttf -lm -lstdc++ -pthread -Wl,--as-needed -Wl,--gc-sections -s
+
 ifeq ($(TARGET),rg350)
 	TOOLCHAIN=/home/blake/src/RG350_buildroot/output/host
 	SYSROOT=$(TOOLCHAIN)/usr/mipsel-gcw0-linux-uclibc/sysroot
 	CC=$(TOOLCHAIN)/usr/bin/mipsel-linux-gcc
+	CFLAGS += -DTARGET_RG350
 else
 	SYSROOT=/
 	CC=gcc
 endif
 
-CFLAGS=-Wall -Isrc
-LDFLAGS=-lSDL2 -lSDL2_ttf -lm -lstdc++ -pthread -Wl,--as-needed -Wl,--gc-sections -s
 
 OPK_DIR=opk
 OPK_FILE=$(PROG).gcw0.desktop
 OPK_ICON=icon.png
+ASSETS_DIR=assets
 
 C_SOURCES=src/rombp.c src/ips.c src/ui.c
 
@@ -29,6 +32,7 @@ $(PROG).opk: $(PROG) $(OPK_DIR)
 	cp $(PROG) $(OPK_DIR)
 	cp $(OPK_FILE) $(OPK_DIR)
 	cp $(OPK_ICON) $(OPK_DIR)
+	cp -rv $(ASSETS_DIR) $(OPK_DIR)
 	mksquashfs $(OPK_DIR) $@ -all-root -noappend -no-exports -no-xattrs
 
 $(PROG): $(OBJS)

@@ -28,8 +28,6 @@ typedef struct rombp_sdl {
     TTF_Font* menu_font;
 } rombp_sdl;
 
-#define MENU_ITEM_COUNT 27
-
 typedef struct rombp_ui {
     rombp_screen current_screen;
     rombp_sdl sdl;
