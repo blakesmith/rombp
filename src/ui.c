@@ -40,7 +40,7 @@ static inline int get_texture_height(SDL_Texture* texture) {
 }
 
 static int new_text_texture(rombp_ui* ui, const char* text, SDL_Color color, SDL_Texture** texture) {
-    SDL_Surface* text_surface = TTF_RenderUTF8_Blended(ui->sdl.menu_font,
+    SDL_Surface* text_surface = TTF_RenderUTF8_Solid(ui->sdl.menu_font,
                                                      text,
                                                      color);
     if (text_surface == NULL) {
