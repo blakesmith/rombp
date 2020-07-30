@@ -1,5 +1,4 @@
 - Validate the patch file before creating a copy
-- Display file IO errors (can't open a file for copying, etc.)
 - Make a menu icon
 - Make fonts look better?
 - Back button goes up a directory, select = quit?

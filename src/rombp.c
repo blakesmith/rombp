@@ -110,6 +110,7 @@ int main() {
                     ui_status_bar_reset_text(&ui, &ui.bottom_bar, "ERROR: Not a valid patch type");
                     rombp_log_err("Invalid patch type\n");
                 } else if (err == ERR_FILE_IO) {
+                    ui_status_bar_reset_text(&ui, &ui.bottom_bar, "ERROR: Cannot write ROM");
                     rombp_log_err("Failed to patch file, io error: %d\n", rc);
                 } else {
                     static const char *success_message = "Success! Wrote %d hunks";
