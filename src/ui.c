@@ -141,7 +141,7 @@ static char* concat_path(char* parent, char* child) {
     return next_path;
 }
 
-static int ui_change_directory(rombp_ui* ui, char* dir) {
+static int validate_directory(char* dir) {
     struct stat dir_stat;
 
     int rc = stat(dir, &dir_stat);
@@ -153,25 +153,37 @@ static int ui_change_directory(rombp_ui* ui, char* dir) {
         rombp_log_err("Not a valid directory: %s\n", dir);
         return -1;
     }
+
+    return 0;
+}
+
+static int ui_change_directory(rombp_ui* ui, char* dir) {
     size_t size = strlen(dir) + 1;
 
+    char* next_directory = NULL;
     if (ui->current_directory == NULL) {
-        ui->current_directory = malloc(size);
-        if (ui->current_directory == NULL) {
+        next_directory = malloc(size);
+        if (next_directory == NULL) {
             rombp_log_err("Failed to alloc directory path: %s\n", dir);
             return -1;
         }
-        strncpy(ui->current_directory, dir, size);
+        strncpy(next_directory, dir, size);
     } else {
-        char* next_directory = concat_path(ui->current_directory, dir);
+        next_directory = concat_path(ui->current_directory, dir);
         if (next_directory == NULL) {
             rombp_log_err("Couldn't get next directory\n");
             return -1;
         }
-
         free(ui->current_directory);
-        ui->current_directory = next_directory;
     }
+
+    if (validate_directory(next_directory)) {
+        rombp_log_err("Trying to change to change to invalid directory: %s\n", next_directory);
+        free(next_directory);
+        return -1;
+    }
+
+    ui->current_directory = next_directory;
 
     return 0;
 }
@@ -255,6 +267,7 @@ int ui_start(rombp_ui* ui) {
 
     int rc = ui_change_directory(ui, STARTING_DIR);
     if (rc < 0) {
+        rombp_log_info("Could not switch to starting dir, falling back to /\n");
         // Fallback to trying the root dir
         rc = ui_change_directory(ui, "/");
         if (rc < 0) {
