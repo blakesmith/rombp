@@ -1,4 +1,5 @@
 #include <sys/param.h>
+#include <sys/stat.h>
 
 #include "log.h"
 #include "ui.h"
@@ -10,6 +11,7 @@
 #define SCALING_FACTOR 1.0
 #define WINDOW_SETTING SDL_WINDOW_FULLSCREEN_DESKTOP
 #define MENU_ITEM_COUNT 11
+#define STARTING_DIR "/media"
 #else
 #define MENU_FONT_SIZE 36
 #define SCREEN_WIDTH 1280
@@ -17,6 +19,7 @@
 #define SCALING_FACTOR 1.0
 #define WINDOW_SETTING SDL_WINDOW_SHOWN
 #define MENU_ITEM_COUNT 24
+#define STARTING_DIR "/"
 #endif
 
 static const int menu_padding_left_right = 15;
@@ -139,6 +142,17 @@ static char* concat_path(char* parent, char* child) {
 }
 
 static int ui_change_directory(rombp_ui* ui, char* dir) {
+    struct stat dir_stat;
+
+    int rc = stat(dir, &dir_stat);
+    if (rc != 0) {
+        rombp_log_err("Failed to stat directory: %s\n", dir);
+        return -1;
+    }
+    if (!S_ISDIR(dir_stat.st_mode)) {
+        rombp_log_err("Not a valid directory: %s\n", dir);
+        return -1;
+    }
     size_t size = strlen(dir) + 1;
 
     if (ui->current_directory == NULL) {
@@ -239,10 +253,14 @@ int ui_start(rombp_ui* ui) {
         return -1;
     }
 
-    int rc = ui_change_directory(ui, ".");
+    int rc = ui_change_directory(ui, STARTING_DIR);
     if (rc < 0) {
-        rombp_log_err("Failed to change directory: %d\n", rc);
-        return -1;
+        // Fallback to trying the root dir
+        rc = ui_change_directory(ui, "/");
+        if (rc < 0) {
+            rombp_log_err("Failed to change directory: %d\n", rc);
+            return -1;
+        }
     }
     rc = ui_scan_directory(ui);
     if (rc < 0) {

@@ -2,7 +2,7 @@
 Type=Application
 Name=ROMBP
 Comment=ROM IPS bin patcher
-Exec=./rombp %f
+Exec=./rombp
 Icon=icon
 Terminal=false
 Categories=applcations;
