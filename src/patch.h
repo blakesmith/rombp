@@ -1,3 +1,6 @@
+#ifndef ROMBP_PATCH_H_
+#define ROMBP_PATCH_H_
+
 typedef enum rombp_patch_type {
     PATCH_TYPE_UNKNOWN = -1,
     PATCH_TYPE_IPS = 0,
@@ -16,3 +19,4 @@ typedef enum rombp_hunk_iter_status {
     HUNK_NEXT = 2,
 } rombp_hunk_iter_status;
 
+#endif

@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <errno.h>
 
+#include "bps.h"
 #include "ips.h"
 #include "log.h"
 #include "ui.h"
