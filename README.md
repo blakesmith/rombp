@@ -19,16 +19,16 @@ console.
 I've only tested with an RG350M, but in theory, it should work with
 other OpenDingux MIPS64 based handhelds as well.
 
-![Desktop screenshot](https://raw.github.com/blakesmith/rombp/master/doc/screenshot.jpg)
+![Desktop screenshot](https://raw.github.com/blakesmith/rombp/master/docs/screenshot.jpg)
 
 Here it is running on the RG350M:
 
-![RG350M image](https://raw.github.com/blakesmith/rombp/master/doc/rg350m.jpg)
+![RG350M image](https://raw.github.com/blakesmith/rombp/master/docs/rg350m.jpg)
 
 # Installing
 
 Head over to the
-[https://github.com/blakesmith/rombp/releases](releases page) to
+[releases page](https://github.com/blakesmith/rombp/releases) to
 download the latest OpenDingux OPK file. You should be able to run the
 OPK file just like your other programs.
 
