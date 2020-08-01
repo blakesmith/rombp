@@ -1,8 +1,12 @@
 CFLAGS=-Wall -Isrc
 LDFLAGS=-lSDL2 -lSDL2_ttf -lm -lstdc++ -pthread -Wl,--as-needed -Wl,--gc-sections -s
 
+ifndef RG350_TOOLCHAIN
+$(error RG350_TOOLCHAIN environment variable must be set! Please point it to the RG350 buildroot directory.)
+endif
+
 ifeq ($(TARGET),rg350)
-	TOOLCHAIN=/home/blake/src/RG350_buildroot/output/host
+	TOOLCHAIN=$(RG350_TOOLCHAIN)/output/host
 	SYSROOT=$(TOOLCHAIN)/usr/mipsel-gcw0-linux-uclibc/sysroot
 	CC=$(TOOLCHAIN)/usr/bin/mipsel-linux-gcc
 	CFLAGS += -DTARGET_RG350
