@@ -23,9 +23,11 @@ static void close_files(FILE* input_file, FILE* output_file, FILE* ips_file) {
 }
 
 static rombp_patch_type detect_patch_type(FILE* patch_file) {
+    rombp_log_info("Trying to detect IPS patch type\n");
     int rc = ips_verify_header(patch_file);
 
     if (rc == 0) {
+        rombp_log_info("Detected patch type: IPS\n");
         return PATCH_TYPE_IPS;
     }
 
@@ -35,8 +37,10 @@ static rombp_patch_type detect_patch_type(FILE* patch_file) {
         return PATCH_TYPE_UNKNOWN;
     }
 
+    rombp_log_info("Trying to detect BPS patch type\n");
     rc = bps_verify_header(patch_file);
     if (rc == 0) {
+        rombp_log_info("Detected patch type: BPS\n");
         return PATCH_TYPE_BPS;
     }
 
@@ -49,12 +53,16 @@ static int start_patch(rombp_patch_type patch_type, FILE* input_file, FILE* outp
     rombp_log_info("Start patching\n");
     switch (patch_type) {
         case PATCH_TYPE_IPS:
+            rombp_log_info("Patch type started with IPS!\n");
             rc = ips_start(input_file, output_file);
             if (rc != PATCH_OK) {
                 rombp_log_err("Failed to start patching IPS file: %d\n", rc);
                 return -1;
             }
             return 0;
+        case PATCH_TYPE_BPS:
+            rombp_log_err("BPS patching not implemented yet\n");
+            return -1;
         default:
             rombp_log_err("Cannot start unknown patch type\n");
             return -1;
@@ -100,7 +108,7 @@ int ui_loop(rombp_patch_command* command) {
     FILE* output_file;
     FILE* ips_file;
 
-    rombp_patch_type patch_type;
+    rombp_patch_type patch_type = PATCH_TYPE_UNKNOWN;
     rombp_hunk_iter_status hunk_status = HUNK_NONE;
     int hunk_count = 0;
     int sleep_delay = DEFAULT_SLEEP;

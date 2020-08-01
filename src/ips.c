@@ -52,11 +52,6 @@ static int copy_file(FILE* input_file, FILE* output_file) {
     return 0;
 }
 
-static const uint8_t IPS_EXPECTED_HEADER[] = {
-    0x50, 0x41, 0x54, 0x43, 0x48 // PATCH
-};
-static const size_t IPS_HEADER_SIZE = sizeof(IPS_EXPECTED_HEADER) / sizeof(uint8_t);
-
 rombp_patch_err ips_start(FILE* input_file, FILE* output_file) {
     // Once the header is verified, copy the input to output
     int rc = copy_file(input_file, output_file);
@@ -68,23 +63,13 @@ rombp_patch_err ips_start(FILE* input_file, FILE* output_file) {
     return PATCH_OK;
 }
 
+static const uint8_t IPS_EXPECTED_MARKER[] = {
+    0x50, 0x41, 0x54, 0x43, 0x48 // PATCH
+};
+static const size_t IPS_MARKER_SIZE = sizeof(IPS_EXPECTED_MARKER) / sizeof(uint8_t);
+
 rombp_patch_err ips_verify_header(FILE* ips_file) {
-    uint8_t buf[IPS_HEADER_SIZE];
-
-    size_t nread = fread(&buf, 1, IPS_HEADER_SIZE, ips_file);
-    if (nread < IPS_HEADER_SIZE) {
-        rombp_log_err("IPS header malformed, expected to get at least %ld bytes in the IPS file, read: %ld\n", (long int)IPS_HEADER_SIZE, (long int)nread);
-        return PATCH_INVALID_HEADER;
-    }
-
-    for (int i = 0; i < IPS_HEADER_SIZE; i++) {
-        if (IPS_EXPECTED_HEADER[i] != buf[i]) {
-            rombp_log_err("IPS header at byte %d doesn't match. Value: %d\n", i, buf[i]);
-            return PATCH_INVALID_HEADER;
-        }
-    }
-
-    return PATCH_OK;
+    return patch_verify_marker(ips_file, IPS_EXPECTED_MARKER, IPS_MARKER_SIZE);
 }
 
 static const size_t HUNK_PREAMBLE_BYTE_SIZE = 5;
