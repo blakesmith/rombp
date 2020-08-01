@@ -18,7 +18,7 @@ endif
 
 OPK_DIR=opk
 OPK_FILE=$(PROG).gcw0.desktop
-OPK_ICON=icon.png
+OPK_ICON=images/icon.png
 ASSETS_DIR=assets
 
 C_SOURCES=src/rombp.c src/ips.c src/ui.c
