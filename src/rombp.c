@@ -82,13 +82,8 @@ static rombp_patch_err patch_file(rombp_patch_command* command) {
     return hunk_count;
 }
 
-int main() {
-    rombp_patch_command command;
+int ui_loop(rombp_patch_command* command) {
     rombp_ui ui;
-
-    command.input_file = NULL;
-    command.ips_file = NULL;
-    command.output_file = NULL;
 
     int rc = ui_start(&ui);
     if (rc != 0) {
@@ -97,7 +92,7 @@ int main() {
     }
 
     while (1) {
-        rombp_ui_event event = ui_handle_event(&ui, &command);
+        rombp_ui_event event = ui_handle_event(&ui, command);
         rombp_patch_err err;
 
         switch (event) {
@@ -105,7 +100,7 @@ int main() {
                 ui_stop(&ui);
                 return 0;
             case EV_PATCH_COMMAND:
-                err = patch_file(&command);
+                err = patch_file(command);
                 if (err == ERR_BAD_PATCH_TYPE) {
                     ui_status_bar_reset_text(&ui, &ui.bottom_bar, "ERROR: Not a valid patch type");
                     rombp_log_err("Invalid patch type\n");
@@ -133,5 +128,20 @@ int main() {
 
         SDL_Delay(16);
     }
+}
 
+int main(int argc, char** argv) {
+    rombp_patch_command command;
+
+    command.input_file = NULL;
+    command.ips_file = NULL;
+    command.output_file = NULL;
+
+    int rc = ui_loop(&command);
+    if (rc != 0) {
+        rombp_log_err("Failed to initiate UI loop: %d\n", rc);
+        return -1;
+    }
+
+    return 0;
 }
