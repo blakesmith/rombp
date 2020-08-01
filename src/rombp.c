@@ -21,17 +21,6 @@ static void close_files(FILE* input_file, FILE* output_file, FILE* ips_file) {
     }
 }
 
-typedef enum rombp_patch_err {
-    ERR_OK = 0,
-    ERR_FILE_IO = -1,
-    ERR_BAD_PATCH_TYPE = -2,
-} rombp_patch_err;
-
-typedef enum rombp_patch_type {
-    PATCH_TYPE_UNKNOWN = -1,
-    PATCH_TYPE_IPS = 0,
-} rombp_patch_type;
-
 static rombp_patch_type detect_patch_type(FILE* patch_file) {
     int rc = ips_verify_header(patch_file);
 
@@ -49,7 +38,7 @@ static int start_patch(rombp_patch_type patch_type, FILE* input_file, FILE* outp
     switch (patch_type) {
         case PATCH_TYPE_IPS:
             rc = ips_start(input_file, output_file);
-            if (rc != IPS_OK) {
+            if (rc != PATCH_OK) {
                 rombp_log_err("Failed to start patching IPS file: %d\n", rc);
                 return -1;
             }
@@ -60,7 +49,7 @@ static int start_patch(rombp_patch_type patch_type, FILE* input_file, FILE* outp
     }
 }
 
-static ips_hunk_iter_status next_hunk(rombp_patch_type patch_type, FILE* input_file, FILE* output_file, FILE* patch_file) {
+static rombp_hunk_iter_status next_hunk(rombp_patch_type patch_type, FILE* input_file, FILE* output_file, FILE* patch_file) {
     switch (patch_type) {
         case PATCH_TYPE_IPS: return ips_next(input_file, output_file, patch_file);
         default: return HUNK_NONE;
@@ -71,24 +60,24 @@ static rombp_patch_err open_patch_files(FILE** input_file, FILE** output_file, F
     *input_file = fopen(command->input_file, "r");
     if (input_file == NULL) {
         rombp_log_err("Failed to open input file: %s, errno: %d\n", command->input_file, errno);
-        return ERR_FILE_IO;
+        return PATCH_ERR_IO;
     }
 
     *output_file = fopen(command->output_file, "w");
     if (output_file == NULL) {
         rombp_log_err("Failed to open output file: %d\n", errno);
         close_files(*input_file, NULL, NULL);
-        return ERR_FILE_IO;
+        return PATCH_ERR_IO;
     }
 
     *ips_file = fopen(command->ips_file, "r");
     if (ips_file == NULL) {
         rombp_log_err("Failed to open IPS file: %d\n", errno);
         close_files(*input_file, *output_file, NULL);
-        return ERR_FILE_IO;
+        return PATCH_ERR_IO;
     }
 
-    return ERR_OK;
+    return PATCH_OK;
 }
 
 int ui_loop(rombp_patch_command* command) {
@@ -100,7 +89,7 @@ int ui_loop(rombp_patch_command* command) {
     FILE* ips_file;
 
     rombp_patch_type patch_type;
-    ips_hunk_iter_status hunk_status = HUNK_NONE;
+    rombp_hunk_iter_status hunk_status = HUNK_NONE;
     int hunk_count = 0;
     int sleep_delay = DEFAULT_SLEEP;
     
@@ -120,7 +109,7 @@ int ui_loop(rombp_patch_command* command) {
                 return 0;
             case EV_PATCH_COMMAND:
                 err = open_patch_files(&input_file, &output_file, &ips_file, command);
-                if (err == ERR_FILE_IO) {
+                if (err == PATCH_ERR_IO) {
                     ui_status_bar_reset_text(&ui, &ui.bottom_bar, "ERROR: Cannot open files for patching");
                     rombp_log_err("Failed to open files for patching: %d\n", err);
                     break;
