@@ -68,7 +68,7 @@ static const uint8_t IPS_EXPECTED_MARKER[] = {
 };
 static const size_t IPS_MARKER_SIZE = sizeof(IPS_EXPECTED_MARKER) / sizeof(uint8_t);
 
-rombp_patch_err ips_verify_header(FILE* ips_file) {
+rombp_patch_err ips_verify_marker(FILE* ips_file) {
     return patch_verify_marker(ips_file, IPS_EXPECTED_MARKER, IPS_MARKER_SIZE);
 }
 

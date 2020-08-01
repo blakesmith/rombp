@@ -5,7 +5,7 @@ static const uint8_t BPS_EXPECTED_MARKER[] = {
 };
 static const size_t BPS_MARKER_SIZE = sizeof(BPS_EXPECTED_MARKER) / sizeof(uint8_t);
 
-rombp_patch_err bps_verify_header(FILE* bps_file) {
+rombp_patch_err bps_verify_marker(FILE* bps_file) {
     return patch_verify_marker(bps_file, BPS_EXPECTED_MARKER, BPS_MARKER_SIZE);
 }
 

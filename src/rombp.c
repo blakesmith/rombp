@@ -24,7 +24,7 @@ static void close_files(FILE* input_file, FILE* output_file, FILE* ips_file) {
 
 static rombp_patch_type detect_patch_type(FILE* patch_file) {
     rombp_log_info("Trying to detect IPS patch type\n");
-    int rc = ips_verify_header(patch_file);
+    int rc = ips_verify_marker(patch_file);
 
     if (rc == 0) {
         rombp_log_info("Detected patch type: IPS\n");
@@ -38,7 +38,7 @@ static rombp_patch_type detect_patch_type(FILE* patch_file) {
     }
 
     rombp_log_info("Trying to detect BPS patch type\n");
-    rc = bps_verify_header(patch_file);
+    rc = bps_verify_marker(patch_file);
     if (rc == 0) {
         rombp_log_info("Detected patch type: BPS\n");
         return PATCH_TYPE_BPS;
