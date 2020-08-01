@@ -5,4 +5,4 @@ Comment=ROM IPS bin patcher
 Exec=./rombp
 Icon=icon
 Terminal=false
-Categories=applcations;
+Categories=applications;
