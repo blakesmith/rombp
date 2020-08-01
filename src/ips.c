@@ -205,12 +205,12 @@ static int ips_write_hunk(FILE* ips_file, FILE* output_file, uint32_t hunk_lengt
     return 0;
 }
 
-static int ips_patch_hunk(ips_hunk_header* hunk_header, FILE* input_file, FILE* output_file, FILE* ips_file, int hunk_count) {
+static int ips_patch_hunk(ips_hunk_header* hunk_header, FILE* input_file, FILE* output_file, FILE* ips_file) {
     // Seek the output file to the specified hunk offset
     int rc = fseek(output_file, hunk_header->offset, SEEK_SET);
     if (rc == -1) {
-        rombp_log_err("Error seeking output file to offset: %d, at hunk: %d, error: %d\n",
-                      hunk_header->offset, hunk_count, errno);
+        rombp_log_err("Error seeking output file to offset: %d, error: %d\n",
+                      hunk_header->offset, errno);
         return rc;
     }
 
@@ -233,45 +233,40 @@ static int ips_patch_hunk(ips_hunk_header* hunk_header, FILE* input_file, FILE* 
         }
         rc = ips_write_rle_hunk(output_file, rle_hunk_length, rle_value);
         if (rc < 0) {
-            rombp_log_err("Failed to write RLE hunk value to output, at hunk: %d, rle length: %d, rle value: %d\n",
-                          hunk_count, rle_hunk_length, rle_value);
+            rombp_log_err("Failed to write RLE hunk value to output, rle length: %d, rle value: %d\n",
+                          rle_hunk_length, rle_value);
             return rc;
         }
     } else {
         rc = ips_write_hunk(ips_file, output_file, hunk_header->length);
         if (rc < 0) {
-            rombp_log_err("Failed writing non-RLE hunk value to output, at hunk: %d, length: %d\n",
-                          hunk_count, hunk_header->length);
+            rombp_log_err("Failed writing non-RLE hunk value to output, length: %d\n",
+                          hunk_header->length);
             return rc;
         }
     }
 
     return 0;
+}
+
+ips_hunk_iter_status ips_next(FILE* input_file, FILE* output_file, FILE* ips_file) {
+    ips_hunk_header hunk_header;
+
+    int rc = ips_next_hunk_header(ips_file, &hunk_header);
+    if (rc < 0) {
+        rombp_log_err("Error getting next hunk, at hunk count: %d\n", rc);
+        return HUNK_ERR_IPS;
+    } else if (rc == HUNK_DONE) {
+        return HUNK_DONE;
+    } else {
+        assert(rc == HUNK_NEXT);
+        rc = ips_patch_hunk(&hunk_header, input_file, output_file, ips_file);
+        if (rc < 0) {
+            rombp_log_err("Failed to patch next hunk: %d\n", rc);
+            return HUNK_ERR_IPS;
+        }
+
+        return HUNK_NEXT;
+    }
 }
  
-int ips_patch(FILE* input_file, FILE* output_file, FILE* ips_file) {
-    int rc;
-
-    // Then, iterate through IPS hunks
-    int hunk_count = 0;
-    ips_hunk_header hunk_header;
-    while (1) {
-        rc = ips_next_hunk_header(ips_file, &hunk_header);
-        if (rc < 0) {
-            rombp_log_err("Error getting next hunk, at hunk count: %d\n", hunk_count);
-            return rc;
-        } else if (rc == HUNK_DONE) {
-            return hunk_count;
-        } else {
-            assert(rc == HUNK_NEXT);
-            hunk_count++;
-            rc = ips_patch_hunk(&hunk_header, input_file, output_file, ips_file, hunk_count);
-            if (rc < 0) {
-                rombp_log_err("Failed to patch next hunk, at hunk count: %d\n", hunk_count);
-                return hunk_count;
-            }
-        }
-    }
-
-    return 0;
-}

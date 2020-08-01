@@ -5,6 +5,10 @@
 #include "log.h"
 #include "ui.h"
 
+static const char *PATCH_NEXT_MESSAGE = "Patching. Written %d hunks";
+static const char *PATCH_SUCCESS_MESSAGE = "Success! Wrote %d hunks";
+static const int DEFAULT_SLEEP = 16;
+
 static void close_files(FILE* input_file, FILE* output_file, FILE* ips_file) {
     if (input_file != NULL) {
         fclose(input_file);
@@ -18,6 +22,7 @@ static void close_files(FILE* input_file, FILE* output_file, FILE* ips_file) {
 }
 
 typedef enum rombp_patch_err {
+    ERR_OK = 0,
     ERR_FILE_IO = -1,
     ERR_BAD_PATCH_TYPE = -2,
 } rombp_patch_err;
@@ -40,6 +45,7 @@ static rombp_patch_type detect_patch_type(FILE* patch_file) {
 static int start_patch(rombp_patch_type patch_type, FILE* input_file, FILE* output_file) {
     int rc;
 
+    rombp_log_info("Start patching\n");
     switch (patch_type) {
         case PATCH_TYPE_IPS:
             rc = ips_start(input_file, output_file);
@@ -54,60 +60,50 @@ static int start_patch(rombp_patch_type patch_type, FILE* input_file, FILE* outp
     }
 }
 
-static rombp_patch_err patch_file(rombp_patch_command* command) {
-    rombp_log_info("Patching file\n");
+static ips_hunk_iter_status next_hunk(rombp_patch_type patch_type, FILE* input_file, FILE* output_file, FILE* patch_file) {
+    switch (patch_type) {
+        case PATCH_TYPE_IPS: return ips_next(input_file, output_file, patch_file);
+        default: return HUNK_NONE;
+    }
+}
 
-    FILE* input_file = fopen(command->input_file, "r");
+static rombp_patch_err open_patch_files(FILE** input_file, FILE** output_file, FILE** ips_file, rombp_patch_command* command) {
+    *input_file = fopen(command->input_file, "r");
     if (input_file == NULL) {
         rombp_log_err("Failed to open input file: %s, errno: %d\n", command->input_file, errno);
         return ERR_FILE_IO;
     }
 
-    FILE* output_file = fopen(command->output_file, "w");
+    *output_file = fopen(command->output_file, "w");
     if (output_file == NULL) {
         rombp_log_err("Failed to open output file: %d\n", errno);
-        close_files(input_file, NULL, NULL);
+        close_files(*input_file, NULL, NULL);
         return ERR_FILE_IO;
     }
 
-    FILE* ips_file = fopen(command->ips_file, "r");
+    *ips_file = fopen(command->ips_file, "r");
     if (ips_file == NULL) {
         rombp_log_err("Failed to open IPS file: %d\n", errno);
-        close_files(input_file, output_file, NULL);
+        close_files(*input_file, *output_file, NULL);
         return ERR_FILE_IO;
     }
 
-    rombp_patch_type patch_type = detect_patch_type(ips_file);
-    if (patch_type == PATCH_TYPE_UNKNOWN) {
-        rombp_log_err("Bad patch file type: %d\n", patch_type);
-        ui_free_command(command);
-        close_files(input_file, output_file, ips_file);
-        return ERR_BAD_PATCH_TYPE;
-    }
-
-    int rc = start_patch(patch_type, input_file, output_file);
-    if (rc < 0) {
-        rombp_log_err("Failed to start patching, type: %d\n", patch_type);
-        return ERR_FILE_IO;
-    }
-
-    int hunk_count = ips_patch(input_file, output_file, ips_file);
-    if (hunk_count < 0) {
-        rombp_log_err("Failed to copy file: %d\n", hunk_count);
-        close_files(input_file, output_file, ips_file);
-        return hunk_count;
-    }
-
-    close_files(input_file, output_file, ips_file);
-    ui_free_command(command);
-
-    rombp_log_info("Done patching file, hunk count: %d\n", hunk_count);
-    return hunk_count;
+    return ERR_OK;
 }
 
 int ui_loop(rombp_patch_command* command) {
     rombp_ui ui;
+    char tmp_buf[255];
 
+    FILE* input_file;
+    FILE* output_file;
+    FILE* ips_file;
+
+    rombp_patch_type patch_type;
+    ips_hunk_iter_status hunk_status = HUNK_NONE;
+    int hunk_count = 0;
+    int sleep_delay = DEFAULT_SLEEP;
+    
     int rc = ui_start(&ui);
     if (rc != 0) {
         rombp_log_err("Failed to start UI, error code: %d\n", rc);
@@ -123,23 +119,64 @@ int ui_loop(rombp_patch_command* command) {
                 ui_stop(&ui);
                 return 0;
             case EV_PATCH_COMMAND:
-                err = patch_file(command);
-                if (err == ERR_BAD_PATCH_TYPE) {
+                err = open_patch_files(&input_file, &output_file, &ips_file, command);
+                if (err == ERR_FILE_IO) {
+                    ui_status_bar_reset_text(&ui, &ui.bottom_bar, "ERROR: Cannot open files for patching");
+                    rombp_log_err("Failed to open files for patching: %d\n", err);
+                    break;
+                }
+                patch_type = detect_patch_type(ips_file);
+                if (patch_type == PATCH_TYPE_UNKNOWN) {
+                    rombp_log_err("Bad patch file type: %d\n", patch_type);
                     ui_status_bar_reset_text(&ui, &ui.bottom_bar, "ERROR: Not a valid patch type");
-                    rombp_log_err("Invalid patch type\n");
-                } else if (err == ERR_FILE_IO) {
-                    ui_status_bar_reset_text(&ui, &ui.bottom_bar, "ERROR: Cannot write ROM");
-                    rombp_log_err("Failed to patch file, io error: %d\n", rc);
-                } else {
-                    static const char *success_message = "Success! Wrote %d hunks";
-                    char tmp_buf[255];
-                    int hunk_count = err;
+                    ui_free_command(command);
+                    close_files(input_file, output_file, ips_file);
+                    break;
+                }
+                rc = start_patch(patch_type, input_file, output_file);
+                if (rc < 0) {
+                    ui_status_bar_reset_text(&ui, &ui.bottom_bar, "ERROR: Failed to start patching");
+                    rombp_log_err("Failed to start patching, type: %d\n", patch_type);
+                    ui_free_command(command);
+                    close_files(input_file, output_file, ips_file);
+                    break;
+                }
+                hunk_count = 0;
+                hunk_status = HUNK_NEXT;
+                sleep_delay = 0;
+                break;
+            default:
+                break;
+        }
 
-                    sprintf(tmp_buf, success_message, hunk_count);
+        switch (hunk_status) {
+            case HUNK_NEXT:
+                hunk_status = next_hunk(patch_type, input_file, output_file, ips_file);
+                if (hunk_status == HUNK_NEXT) {
+                    hunk_count++;
+                    rombp_log_info("Got next hunk, hunk count: %d\n", hunk_count);
+
+                    sprintf(tmp_buf, PATCH_NEXT_MESSAGE, hunk_count);
                     ui_status_bar_reset_text(&ui, &ui.bottom_bar, tmp_buf);
                 }
                 break;
-            default:
+            case HUNK_DONE:
+                sprintf(tmp_buf, PATCH_SUCCESS_MESSAGE, hunk_count);
+                ui_status_bar_reset_text(&ui, &ui.bottom_bar, tmp_buf);
+                rombp_log_info("Done patching file, hunk count: %d\n", hunk_count);
+
+                close_files(input_file, output_file, ips_file);
+                ui_free_command(command);
+
+                // reset hunk state
+                hunk_status = HUNK_NONE;
+                sleep_delay = DEFAULT_SLEEP;
+                break;
+            case HUNK_ERR_IPS:
+                ui_status_bar_reset_text(&ui, &ui.bottom_bar, "ERROR: Cannot write ROM");
+                rombp_log_err("Failed to patch file, io error: %d\n", rc);
+                break;
+            case HUNK_NONE:
                 break;
         }
 
@@ -149,7 +186,9 @@ int ui_loop(rombp_patch_command* command) {
             return rc;
         }
 
-        SDL_Delay(16);
+        if (sleep_delay > 0) {
+            SDL_Delay(sleep_delay);
+        }
     }
 }
 
