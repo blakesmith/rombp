@@ -4,9 +4,11 @@
 #include <stdio.h>
 #include <stdint.h>
 
-enum ips_err {
+typedef enum ips_err {
+    IPS_OK = 0,
     IPS_INVALID_HEADER = 1,
-};
+    IPS_ERR_IO = 2,
+} ips_err;
 
 enum ips_hunk_iter_status {
     HUNK_ERR_IPS = -1,
@@ -19,7 +21,8 @@ typedef struct ips_hunk_header {
     uint16_t length;
 } ips_hunk_header;
 
-int ips_verify_header(FILE* ips_file);
+ips_err ips_verify_header(FILE* ips_file);
+ips_err ips_start(FILE* input_file, FILE* output_file);
 int ips_patch(FILE* input_file, FILE* outut_file, FILE* ips_file);
 
 #endif

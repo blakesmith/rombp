@@ -27,7 +27,7 @@ typedef enum rombp_patch_type {
     PATCH_TYPE_IPS = 0,
 } rombp_patch_type;
 
-rombp_patch_type detect_patch_type(FILE* patch_file) {
+static rombp_patch_type detect_patch_type(FILE* patch_file) {
     int rc = ips_verify_header(patch_file);
 
     if (rc == 0) {
@@ -35,6 +35,23 @@ rombp_patch_type detect_patch_type(FILE* patch_file) {
     }
 
     return PATCH_TYPE_UNKNOWN;
+}
+
+static int start_patch(rombp_patch_type patch_type, FILE* input_file, FILE* output_file) {
+    int rc;
+
+    switch (patch_type) {
+        case PATCH_TYPE_IPS:
+            rc = ips_start(input_file, output_file);
+            if (rc != IPS_OK) {
+                rombp_log_err("Failed to start patching IPS file: %d\n", rc);
+                return -1;
+            }
+            return 0;
+        default:
+            rombp_log_err("Cannot start unknown patch type\n");
+            return -1;
+    }
 }
 
 static rombp_patch_err patch_file(rombp_patch_command* command) {
@@ -66,6 +83,12 @@ static rombp_patch_err patch_file(rombp_patch_command* command) {
         ui_free_command(command);
         close_files(input_file, output_file, ips_file);
         return ERR_BAD_PATCH_TYPE;
+    }
+
+    int rc = start_patch(patch_type, input_file, output_file);
+    if (rc < 0) {
+        rombp_log_err("Failed to start patching, type: %d\n", patch_type);
+        return ERR_FILE_IO;
     }
 
     int hunk_count = ips_patch(input_file, output_file, ips_file);

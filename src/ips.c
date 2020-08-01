@@ -57,7 +57,18 @@ static const uint8_t IPS_EXPECTED_HEADER[] = {
 };
 static const size_t IPS_HEADER_SIZE = sizeof(IPS_EXPECTED_HEADER) / sizeof(uint8_t);
 
-int ips_verify_header(FILE* ips_file) {
+ips_err ips_start(FILE* input_file, FILE* output_file) {
+    // Once the header is verified, copy the input to output
+    int rc = copy_file(input_file, output_file);
+    if (rc != 0) {
+        rombp_log_err("Failed to seek to copy input file to output file: %d\n", rc);
+        return IPS_ERR_IO;
+    }
+
+    return IPS_OK;
+}
+
+ips_err ips_verify_header(FILE* ips_file) {
     uint8_t buf[IPS_HEADER_SIZE];
 
     size_t nread = fread(&buf, 1, IPS_HEADER_SIZE, ips_file);
@@ -73,7 +84,7 @@ int ips_verify_header(FILE* ips_file) {
         }
     }
 
-    return 0;
+    return IPS_OK;
 }
 
 static const size_t HUNK_PREAMBLE_BYTE_SIZE = 5;
@@ -240,13 +251,6 @@ static int ips_patch_hunk(ips_hunk_header* hunk_header, FILE* input_file, FILE* 
  
 int ips_patch(FILE* input_file, FILE* output_file, FILE* ips_file) {
     int rc;
-
-    // First, copy the input to output
-    rc = copy_file(input_file, output_file);
-    if (rc != 0) {
-        rombp_log_err("Failed to seek to copy input file to output file: %d\n", rc);
-        return rc;
-    }
 
     // Then, iterate through IPS hunks
     int hunk_count = 0;
