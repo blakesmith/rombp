@@ -1,2 +1,3 @@
+- Add BPS support
+- Make UI update during patching
 - Back button goes up a directory, select = quit?
-- Launcher works

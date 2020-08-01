@@ -193,6 +193,50 @@ static int ips_write_hunk(FILE* ips_file, FILE* output_file, uint32_t hunk_lengt
 
     return 0;
 }
+
+static int ips_patch_hunk(ips_hunk_header* hunk_header, FILE* input_file, FILE* output_file, FILE* ips_file, int hunk_count) {
+    // Seek the output file to the specified hunk offset
+    int rc = fseek(output_file, hunk_header->offset, SEEK_SET);
+    if (rc == -1) {
+        rombp_log_err("Error seeking output file to offset: %d, at hunk: %d, error: %d\n",
+                      hunk_header->offset, hunk_count, errno);
+        return rc;
+    }
+
+    rombp_log_info("Hunk RLE: %d, offset: %d, length: %d, ips_offset: %ld\n",
+                   hunk_header->length == 0,
+                   hunk_header->offset,
+                   hunk_header->length,
+                   ftell(ips_file));
+
+    // 0 length header means the hunk is run length encoded (RLE).
+    // We have to look into the payload to determine how big the hunk
+    // is.
+    if (hunk_header->length == 0) {
+        uint32_t rle_hunk_length;
+        uint8_t rle_value;
+        rc = ips_get_rle_payload(ips_file, &rle_hunk_length, &rle_value);
+        if (rc < 0) {
+            rombp_log_err("Failed to find RLE payload length, err: %d\n", rc);
+            return rc;
+        }
+        rc = ips_write_rle_hunk(output_file, rle_hunk_length, rle_value);
+        if (rc < 0) {
+            rombp_log_err("Failed to write RLE hunk value to output, at hunk: %d, rle length: %d, rle value: %d\n",
+                          hunk_count, rle_hunk_length, rle_value);
+            return rc;
+        }
+    } else {
+        rc = ips_write_hunk(ips_file, output_file, hunk_header->length);
+        if (rc < 0) {
+            rombp_log_err("Failed writing non-RLE hunk value to output, at hunk: %d, length: %d\n",
+                          hunk_count, hunk_header->length);
+            return rc;
+        }
+    }
+
+    return 0;
+}
  
 int ips_patch(FILE* input_file, FILE* output_file, FILE* ips_file) {
     int rc;
@@ -216,48 +260,11 @@ int ips_patch(FILE* input_file, FILE* output_file, FILE* ips_file) {
             return hunk_count;
         } else {
             assert(rc == HUNK_NEXT);
-
             hunk_count++;
-
-            // Seek the output file to the specified hunk offset
-            rc = fseek(output_file, hunk_header.offset, SEEK_SET);
-            if (rc == -1) {
-                rombp_log_err("Error seeking output file to offset: %d, at hunk: %d, error: %d\n",
-                              hunk_header.offset, hunk_count, errno);
-                return rc;
-            }
-
-            
-            rombp_log_info("Hunk RLE: %d, offset: %d, length: %d, ips_offset: %ld\n",
-                           hunk_header.length == 0,
-                           hunk_header.offset,
-                           hunk_header.length,
-                           ftell(ips_file));
-
-            // 0 length header means the hunk is run length encoded (RLE).
-            // We have to look into the payload to determine how big the hunk
-            // is.
-            if (hunk_header.length == 0) {
-                uint32_t rle_hunk_length;
-                uint8_t rle_value;
-                rc = ips_get_rle_payload(ips_file, &rle_hunk_length, &rle_value);
-                if (rc < 0) {
-                    rombp_log_err("Failed to find RLE payload length, err: %d\n", rc);
-                    return rc;
-                }
-                rc = ips_write_rle_hunk(output_file, rle_hunk_length, rle_value);
-                if (rc < 0) {
-                    rombp_log_err("Failed to write RLE hunk value to output, at hunk: %d, rle length: %d, rle value: %d\n",
-                                  hunk_count, rle_hunk_length, rle_value);
-                    return rc;
-                }
-            } else {
-                rc = ips_write_hunk(ips_file, output_file, hunk_header.length);
-                if (rc < 0) {
-                    rombp_log_err("Failed writing non-RLE hunk value to output, at hunk: %d, length: %d\n",
-                                  hunk_count, hunk_header.length);
-                    return rc;
-                }
+            rc = ips_patch_hunk(&hunk_header, input_file, output_file, ips_file, hunk_count);
+            if (rc < 0) {
+                rombp_log_err("Failed to patch next hunk, at hunk count: %d\n", hunk_count);
+                return hunk_count;
             }
         }
     }
