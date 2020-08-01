@@ -29,6 +29,17 @@ static rombp_patch_type detect_patch_type(FILE* patch_file) {
         return PATCH_TYPE_IPS;
     }
 
+    rc = fseek(patch_file, 0, SEEK_SET);
+    if (rc == -1) {
+        rombp_log_err("Error seeking patch file to beginning\n");
+        return PATCH_TYPE_UNKNOWN;
+    }
+
+    rc = bps_verify_header(patch_file);
+    if (rc == 0) {
+        return PATCH_TYPE_BPS;
+    }
+
     return PATCH_TYPE_UNKNOWN;
 }
 

@@ -4,6 +4,7 @@
 typedef enum rombp_patch_type {
     PATCH_TYPE_UNKNOWN = -1,
     PATCH_TYPE_IPS = 0,
+    PATCH_TYPE_BPS = 0,
 } rombp_patch_type;
 
 typedef enum rombp_patch_err {
