@@ -13,7 +13,7 @@
 #define MENU_ITEM_COUNT 11
 #define STARTING_DIR "/media"
 #else
-#define MENU_FONT_SIZE 50
+#define MENU_FONT_SIZE 36
 #define SCREEN_WIDTH 1280
 #define SCREEN_HEIGHT 960
 #define SCALING_FACTOR 1.0
