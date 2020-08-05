@@ -47,10 +47,17 @@ static rombp_patch_type detect_patch_type(FILE* patch_file) {
     return PATCH_TYPE_UNKNOWN;
 }
 
-static int start_patch(rombp_patch_type patch_type, FILE* input_file, FILE* output_file) {
+// Used for any patch type specific data types that
+// need to be passed into our start function.
+typedef union {
+    bps_file_header bps_file_header;
+} rombp_patch_context;
+
+static int start_patch(rombp_patch_type patch_type, rombp_patch_context* ctx, FILE* input_file, FILE* patch_file, FILE* output_file) {
     int rc;
 
     rombp_log_info("Start patching\n");
+
     switch (patch_type) {
         case PATCH_TYPE_IPS:
             rombp_log_info("Patch type started with IPS!\n");
@@ -61,8 +68,12 @@ static int start_patch(rombp_patch_type patch_type, FILE* input_file, FILE* outp
             }
             return 0;
         case PATCH_TYPE_BPS:
-            rombp_log_err("BPS patching not implemented yet\n");
-            return -1;
+            rc = bps_start(patch_file, &ctx->bps_file_header);
+            if (rc != PATCH_OK) {
+                rombp_log_err("Failed to start patching BPS file: %d\n", rc);
+                return -1;
+            }
+            return 0;
         default:
             rombp_log_err("Cannot start unknown patch type\n");
             return -1;
@@ -106,7 +117,7 @@ int ui_loop(rombp_patch_command* command) {
 
     FILE* input_file;
     FILE* output_file;
-    FILE* ips_file;
+    FILE* patch_file;
 
     rombp_patch_type patch_type = PATCH_TYPE_UNKNOWN;
     rombp_hunk_iter_status hunk_status = HUNK_NONE;
@@ -128,26 +139,27 @@ int ui_loop(rombp_patch_command* command) {
                 ui_stop(&ui);
                 return 0;
             case EV_PATCH_COMMAND:
-                err = open_patch_files(&input_file, &output_file, &ips_file, command);
+                err = open_patch_files(&input_file, &output_file, &patch_file, command);
                 if (err == PATCH_ERR_IO) {
                     ui_status_bar_reset_text(&ui, &ui.bottom_bar, "ERROR: Cannot open files for patching");
                     rombp_log_err("Failed to open files for patching: %d\n", err);
                     break;
                 }
-                patch_type = detect_patch_type(ips_file);
+                patch_type = detect_patch_type(patch_file);
                 if (patch_type == PATCH_TYPE_UNKNOWN) {
                     rombp_log_err("Bad patch file type: %d\n", patch_type);
                     ui_status_bar_reset_text(&ui, &ui.bottom_bar, "ERROR: Not a valid patch type");
                     ui_free_command(command);
-                    close_files(input_file, output_file, ips_file);
+                    close_files(input_file, output_file, patch_file);
                     break;
                 }
-                rc = start_patch(patch_type, input_file, output_file);
+                rombp_patch_context patch_ctx;
+                rc = start_patch(patch_type, &patch_ctx, input_file, patch_file, output_file);
                 if (rc < 0) {
                     ui_status_bar_reset_text(&ui, &ui.bottom_bar, "ERROR: Failed to start patching");
                     rombp_log_err("Failed to start patching, type: %d\n", patch_type);
                     ui_free_command(command);
-                    close_files(input_file, output_file, ips_file);
+                    close_files(input_file, output_file, patch_file);
                     break;
                 }
                 hunk_count = 0;
@@ -160,7 +172,7 @@ int ui_loop(rombp_patch_command* command) {
 
         switch (hunk_status) {
             case HUNK_NEXT:
-                hunk_status = next_hunk(patch_type, input_file, output_file, ips_file);
+                hunk_status = next_hunk(patch_type, input_file, output_file, patch_file);
                 if (hunk_status == HUNK_NEXT) {
                     hunk_count++;
                     rombp_log_info("Got next hunk, hunk count: %d\n", hunk_count);
@@ -174,7 +186,7 @@ int ui_loop(rombp_patch_command* command) {
                 ui_status_bar_reset_text(&ui, &ui.bottom_bar, tmp_buf);
                 rombp_log_info("Done patching file, hunk count: %d\n", hunk_count);
 
-                close_files(input_file, output_file, ips_file);
+                close_files(input_file, output_file, patch_file);
                 ui_free_command(command);
 
                 // reset hunk state
