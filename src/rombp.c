@@ -6,8 +6,12 @@
 #include "log.h"
 #include "ui.h"
 
-static const char *PATCH_NEXT_MESSAGE = "Patching. Written %d hunks";
-static const char *PATCH_SUCCESS_MESSAGE = "Success! Wrote %d hunks";
+static const char* PATCH_NEXT_MESSAGE = "Patching. Written %d hunks";
+static const char* PATCH_SUCCESS_MESSAGE = "Success! Wrote %d hunks";
+static const char* PATCH_FAIL_INVALID_OUTPUT_SIZE_MESSAGE = "ERR: Invalid output size!";
+static const char* PATCH_FAIL_INVALID_OUTPUT_CHECKSUM_MESSAGE = "ERR: Invalid output checksum!";
+static const char* PATCH_UNKNOWN_ERROR_MESSAGE = "ERR: Unknown end error!";
+
 static const int DEFAULT_SLEEP = 16;
 static const int HUNKS_PER_UI_LOOP = 10;
 
@@ -78,6 +82,16 @@ static int start_patch(rombp_patch_type patch_type, rombp_patch_context* ctx, FI
         default:
             rombp_log_err("Cannot start unknown patch type\n");
             return -1;
+    }
+}
+
+static rombp_patch_err end_patch(rombp_patch_type patch_type, rombp_patch_context* ctx, FILE* patch_file) {
+    rombp_log_info("End patching\n");
+    switch (patch_type) {
+        case PATCH_TYPE_BPS: return bps_end(&ctx->bps_file_header, patch_file);
+        case PATCH_TYPE_IPS:
+        default:
+            return PATCH_OK; // No cleanup work for IPS patches, by default nothing left to do.
     }
 }
 
@@ -189,10 +203,22 @@ int ui_loop(rombp_patch_command* command) {
 
                 break;
             }
-            case HUNK_DONE:
-                sprintf(tmp_buf, PATCH_SUCCESS_MESSAGE, hunk_count);
-                ui_status_bar_reset_text(&ui, &ui.bottom_bar, tmp_buf);
-                rombp_log_info("Done patching file, hunk count: %d\n", hunk_count);
+            case HUNK_DONE: {
+                rombp_patch_err end_err = end_patch(patch_type, &patch_ctx, patch_file);
+                if (end_err == PATCH_OK) {
+                    sprintf(tmp_buf, PATCH_SUCCESS_MESSAGE, hunk_count);
+                    ui_status_bar_reset_text(&ui, &ui.bottom_bar, tmp_buf);
+                    rombp_log_info("Done patching file, hunk count: %d\n", hunk_count);
+                } else if (end_err == PATCH_INVALID_OUTPUT_SIZE) {
+                    ui_status_bar_reset_text(&ui, &ui.bottom_bar, PATCH_FAIL_INVALID_OUTPUT_SIZE_MESSAGE);
+                    rombp_log_err("Invalid output size\n");
+                } else if (end_err == PATCH_INVALID_OUTPUT_CHECKSUM) {
+                    ui_status_bar_reset_text(&ui, &ui.bottom_bar, PATCH_FAIL_INVALID_OUTPUT_CHECKSUM_MESSAGE);
+                    rombp_log_err("Invalid output checksum\n");
+                } else {
+                    ui_status_bar_reset_text(&ui, &ui.bottom_bar, PATCH_UNKNOWN_ERROR_MESSAGE);
+                    rombp_log_err("Unknown end error: %d\n", end_err);
+                }
 
                 close_files(input_file, output_file, patch_file);
                 ui_free_command(command);
@@ -201,6 +227,7 @@ int ui_loop(rombp_patch_command* command) {
                 hunk_status = HUNK_NONE;
                 sleep_delay = DEFAULT_SLEEP;
                 break;
+            }
             case HUNK_ERR_IPS:
                 ui_status_bar_reset_text(&ui, &ui.bottom_bar, "ERROR: Cannot write ROM");
                 rombp_log_err("Failed to patch file, io error: %d\n", rc);

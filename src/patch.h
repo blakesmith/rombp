@@ -14,6 +14,10 @@ typedef enum rombp_patch_err {
     PATCH_OK = 0,
     PATCH_INVALID_HEADER = -1,
     PATCH_ERR_IO = -2,
+    PATCH_INVALID_INPUT_SIZE = -3,
+    PATCH_INVALID_OUTPUT_SIZE = -4,
+    PATCH_INVALID_INPUT_CHECKSUM = -5,
+    PATCH_INVALID_OUTPUT_CHECKSUM = -6,
 } rombp_patch_err;
 
 typedef enum rombp_hunk_iter_status {

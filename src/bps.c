@@ -296,3 +296,7 @@ rombp_hunk_iter_status bps_next(bps_file_header* file_header, FILE* input_file, 
 
     return HUNK_NEXT;
 }
+
+rombp_patch_err bps_end(bps_file_header* file_header, FILE* bps_file) {
+    return PATCH_OK;
+}
