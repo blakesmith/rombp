@@ -10,6 +10,13 @@ static const size_t BPS_MARKER_SIZE = sizeof(BPS_EXPECTED_MARKER) / sizeof(uint8
 
 static const size_t FOOTER_LENGTH = 12;
 
+typedef enum bps_command_type {
+    BPS_SOURCE_READ = 0,
+    BPS_TARGET_READ = 1,
+    BPS_SOURCE_COPY = 2,
+    BPS_TARGET_COPY = 3,
+} bps_command_type;
+
 static int decode_varint(FILE* bps_file, uint64_t* out) {
     uint64_t data = 0;
     uint64_t shift = 1;
@@ -83,7 +90,159 @@ rombp_patch_err bps_start(FILE* bps_file, bps_file_header* file_header) {
                    file_header->target_size,
                    file_header->metadata_size);
 
+    file_header->output_offset = 0;
+    file_header->source_relative_offset = 0;
+    file_header->target_relative_offset = 0;
+
     return PATCH_OK;
+}
+
+static rombp_hunk_iter_status bps_source_read(bps_file_header* file_header, uint64_t length, FILE* input_file, FILE* output_file) {
+    int pos = fseek(input_file, file_header->output_offset, SEEK_SET);
+    if (pos == -1) {
+        rombp_log_err("Failed to seek source file. err: %d\n", errno);
+        return HUNK_ERR_IO;
+    }
+
+    pos = fseek(output_file, file_header->output_offset, SEEK_SET);
+    if (pos == -1) {
+        rombp_log_err("Failed to seek target file. err: %d\n", errno);
+        return HUNK_ERR_IO;
+    }
+        
+    for (uint64_t i = 0; i < length; i++) {
+        // Yuck, reading / writing one byte at a time. Speed this up?
+        uint8_t byte;
+        size_t nread = fread(&byte, 1, sizeof(uint8_t), input_file);
+        if (nread < 1 && ferror(input_file)) {
+            rombp_log_err("Error during BPS source read, error: %d\n", ferror(input_file));
+            return HUNK_ERR_IO;
+        }
+        size_t nwritten = fwrite(&byte, 1, sizeof(uint8_t), output_file);
+        if (nwritten < 1 && ferror(output_file)) {
+            rombp_log_err("Error during BPS source read, write error: %d\n", ferror(output_file));
+            return HUNK_ERR_IO;
+        }
+        
+        file_header->output_offset++;
+    }
+
+    return HUNK_NEXT;
+}
+
+static rombp_hunk_iter_status bps_target_read(bps_file_header* file_header, uint64_t length, FILE* output_file, FILE* bps_file) {
+    int pos = fseek(output_file, file_header->output_offset, SEEK_SET);
+    if (pos == -1) {
+        rombp_log_err("Failed to seek target file. err: %d\n", errno);
+        return HUNK_ERR_IO;
+    }
+        
+    for (uint64_t i = 0; i < length; i++) {
+        // Yuck, reading / writing one byte at a time. Speed this up?
+        uint8_t byte;
+        size_t nread = fread(&byte, 1, sizeof(uint8_t), bps_file);
+        if (nread < 1 && ferror(bps_file)) {
+            rombp_log_err("Error during BPS target read, read patch error: %d\n", ferror(bps_file));
+            return HUNK_ERR_IO;
+        }
+        size_t nwritten = fwrite(&byte, 1, sizeof(uint8_t), output_file);
+        if (nwritten < 1 && ferror(output_file)) {
+            rombp_log_err("Error during BPS target read, write error: %d\n", ferror(output_file));
+            return HUNK_ERR_IO;
+        }
+        
+        file_header->output_offset++;
+    }
+
+    return HUNK_NEXT;
+}
+
+static rombp_hunk_iter_status bps_source_copy(bps_file_header* file_header, uint64_t length, FILE* input_file, FILE* output_file, FILE* bps_file) {
+    uint64_t data;
+    int rc = decode_varint(bps_file, &data);
+    if (rc == -1) {
+        rombp_log_err("Failed to decode source relative offset data\n");
+        return HUNK_ERR_IO;
+    }
+    file_header->source_relative_offset += (data & 1 ? -1 : 1) * (data >> 1);
+    rombp_log_info("Source relative offset is: %ld\n", file_header->source_relative_offset);
+
+    int pos = fseek(output_file, file_header->output_offset, SEEK_SET);
+    if (pos == -1) {
+        rombp_log_err("Failed to seek target file. err: %d\n", errno);
+        return HUNK_ERR_IO;
+    }
+
+    pos = fseek(input_file, file_header->source_relative_offset, SEEK_SET);
+    if (pos == -1) {
+        rombp_log_err("Failed to seek target file. err: %d\n", errno);
+        return HUNK_ERR_IO;
+    }
+
+    for (uint64_t i = 0; i < length; i++) {
+        // Yuck, reading / writing one byte at a time. Speed this up?
+        uint8_t byte;
+        size_t nread = fread(&byte, 1, sizeof(uint8_t), input_file);
+        if (nread < 1 && ferror(input_file)) {
+            rombp_log_err("Error during BPS source read, error: %d\n", ferror(input_file));
+            return HUNK_ERR_IO;
+        }
+        size_t nwritten = fwrite(&byte, 1, sizeof(uint8_t), output_file);
+        if (nwritten < 1 && ferror(output_file)) {
+            rombp_log_err("Error during BPS source read, write error: %d\n", ferror(output_file));
+            return HUNK_ERR_IO;
+        }
+
+        file_header->output_offset++;
+        file_header->source_relative_offset++;
+    }
+
+    return HUNK_NEXT;
+}
+
+static rombp_hunk_iter_status bps_target_copy(bps_file_header* file_header, uint64_t length, FILE* output_file, FILE* bps_file) {
+    uint64_t data;
+    int rc = decode_varint(bps_file, &data);
+    if (rc == -1) {
+        rombp_log_err("Failed to decode target relative offset data\n");
+        return HUNK_ERR_IO;
+    }
+    file_header->target_relative_offset += (data & 1 ? -1 : 1) * (data >> 1);
+    rombp_log_info("Target relative offset is: %ld\n", file_header->target_relative_offset);
+
+    for (uint64_t i = 0; i < length; i++) {
+        // Yuck, reading / writing one byte at a time. Speed this up?
+
+        int pos = fseek(output_file, file_header->target_relative_offset, SEEK_SET);
+        if (pos == -1) {
+            rombp_log_err("Failed to seek target file. err: %d\n", errno);
+            return HUNK_ERR_IO;
+        }
+
+        uint8_t byte;
+        size_t nread = fread(&byte, 1, sizeof(uint8_t), output_file);
+        if (nread < 1 && ferror(output_file)) {
+            rombp_log_err("Error during BPS target read, error: %d\n", errno);
+            return HUNK_ERR_IO;
+        }
+
+        pos = fseek(output_file, file_header->output_offset, SEEK_SET);
+        if (pos == -1) {
+            rombp_log_err("Failed to seek target file. err: %d\n", errno);
+            return HUNK_ERR_IO;
+        }
+
+        size_t nwritten = fwrite(&byte, 1, sizeof(uint8_t), output_file);
+        if (nwritten < 1 && ferror(output_file)) {
+            rombp_log_err("Error during BPS source read, write error: %d\n", errno);
+            return HUNK_ERR_IO;
+        }
+
+        file_header->output_offset++;
+        file_header->target_relative_offset++;
+    }
+
+    return HUNK_NEXT;
 }
 
 rombp_hunk_iter_status bps_next(bps_file_header* file_header, FILE* input_file, FILE* output_file, FILE* bps_file) {
@@ -107,11 +266,32 @@ rombp_hunk_iter_status bps_next(bps_file_header* file_header, FILE* input_file, 
 
     rombp_log_info("Command is: %ld, length is: %ld\n", command, length);
 
-    // Skip command for now!
-    int skip_pos = fseek(bps_file, length, SEEK_CUR);
-    if (skip_pos == -1) {
-        rombp_log_err("Failed to skip command. error: %d\n", errno);
-        return HUNK_ERR_IO;
+    switch (command) {
+        case BPS_SOURCE_READ:
+            return bps_source_read(file_header,
+                                   length,
+                                   input_file,
+                                   output_file);
+        case BPS_TARGET_READ:
+            return bps_target_read(file_header,
+                                   length,
+                                   output_file,
+                                   bps_file);
+        case BPS_SOURCE_COPY:
+            return bps_source_copy(file_header,
+                                   length,
+                                   input_file,
+                                   output_file,
+                                   bps_file);
+        case BPS_TARGET_COPY: {
+            return bps_target_copy(file_header,
+                                   length,
+                                   output_file,
+                                   bps_file);
+        }
+        default:
+            rombp_log_err("Unknown BPS command: %ld, aborting!\n", command);
+            return HUNK_ERR_IO;
     }
 
     return HUNK_NEXT;

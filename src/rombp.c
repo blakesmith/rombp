@@ -95,7 +95,7 @@ static rombp_patch_err open_patch_files(FILE** input_file, FILE** output_file, F
         return PATCH_ERR_IO;
     }
 
-    *output_file = fopen(command->output_file, "w");
+    *output_file = fopen(command->output_file, "w+");
     if (output_file == NULL) {
         rombp_log_err("Failed to open output file: %d\n", errno);
         close_files(*input_file, NULL, NULL);
@@ -197,10 +197,22 @@ int ui_loop(rombp_patch_command* command) {
             case HUNK_ERR_IPS:
                 ui_status_bar_reset_text(&ui, &ui.bottom_bar, "ERROR: Cannot write ROM");
                 rombp_log_err("Failed to patch file, io error: %d\n", rc);
+
+                close_files(input_file, output_file, patch_file);
+                ui_free_command(command);
+                
+                hunk_status = HUNK_NONE;
+                sleep_delay = DEFAULT_SLEEP;
                 break;
             case HUNK_ERR_IO:
                 ui_status_bar_reset_text(&ui, &ui.bottom_bar, "ERROR: IO error decoding next patch hunk");
                 rombp_log_err("I/O error during hunk iteration\n");
+
+                close_files(input_file, output_file, patch_file);
+                ui_free_command(command);
+                
+                hunk_status = HUNK_NONE;
+                sleep_delay = DEFAULT_SLEEP;
                 break;
             case HUNK_NONE:
                 break;
