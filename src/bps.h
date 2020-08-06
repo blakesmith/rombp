@@ -10,6 +10,8 @@ typedef struct bps_file_header {
     uint64_t source_size;
     uint64_t target_size;
     uint64_t metadata_size;
+
+    uint64_t patch_size;
 } bps_file_header;
 
 rombp_patch_err bps_verify_marker(FILE* bps_file);

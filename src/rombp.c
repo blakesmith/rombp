@@ -80,9 +80,10 @@ static int start_patch(rombp_patch_type patch_type, rombp_patch_context* ctx, FI
     }
 }
 
-static rombp_hunk_iter_status next_hunk(rombp_patch_type patch_type, FILE* input_file, FILE* output_file, FILE* patch_file) {
+static rombp_hunk_iter_status next_hunk(rombp_patch_type patch_type, rombp_patch_context* patch_ctx, FILE* input_file, FILE* output_file, FILE* patch_file) {
     switch (patch_type) {
         case PATCH_TYPE_IPS: return ips_next(input_file, output_file, patch_file);
+        case PATCH_TYPE_BPS: return bps_next(&patch_ctx->bps_file_header, input_file, output_file, patch_file);
         default: return HUNK_NONE;
     }
 }
@@ -123,6 +124,7 @@ int ui_loop(rombp_patch_command* command) {
     rombp_hunk_iter_status hunk_status = HUNK_NONE;
     int hunk_count = 0;
     int sleep_delay = DEFAULT_SLEEP;
+    rombp_patch_context patch_ctx;
     
     int rc = ui_start(&ui);
     if (rc != 0) {
@@ -153,7 +155,6 @@ int ui_loop(rombp_patch_command* command) {
                     close_files(input_file, output_file, patch_file);
                     break;
                 }
-                rombp_patch_context patch_ctx;
                 rc = start_patch(patch_type, &patch_ctx, input_file, patch_file, output_file);
                 if (rc < 0) {
                     ui_status_bar_reset_text(&ui, &ui.bottom_bar, "ERROR: Failed to start patching");
@@ -172,7 +173,7 @@ int ui_loop(rombp_patch_command* command) {
 
         switch (hunk_status) {
             case HUNK_NEXT:
-                hunk_status = next_hunk(patch_type, input_file, output_file, patch_file);
+                hunk_status = next_hunk(patch_type, &patch_ctx, input_file, output_file, patch_file);
                 if (hunk_status == HUNK_NEXT) {
                     hunk_count++;
                     rombp_log_info("Got next hunk, hunk count: %d\n", hunk_count);
@@ -196,6 +197,10 @@ int ui_loop(rombp_patch_command* command) {
             case HUNK_ERR_IPS:
                 ui_status_bar_reset_text(&ui, &ui.bottom_bar, "ERROR: Cannot write ROM");
                 rombp_log_err("Failed to patch file, io error: %d\n", rc);
+                break;
+            case HUNK_ERR_IO:
+                ui_status_bar_reset_text(&ui, &ui.bottom_bar, "ERROR: IO error decoding next patch hunk");
+                rombp_log_err("I/O error during hunk iteration\n");
                 break;
             case HUNK_NONE:
                 break;

@@ -17,6 +17,7 @@ typedef enum rombp_patch_err {
 } rombp_patch_err;
 
 typedef enum rombp_hunk_iter_status {
+    HUNK_ERR_IO = -2,
     HUNK_ERR_IPS = -1,
     HUNK_NONE = 0,
     HUNK_DONE = 1,
