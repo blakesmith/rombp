@@ -9,6 +9,7 @@
 static const char *PATCH_NEXT_MESSAGE = "Patching. Written %d hunks";
 static const char *PATCH_SUCCESS_MESSAGE = "Success! Wrote %d hunks";
 static const int DEFAULT_SLEEP = 16;
+static const int HUNKS_PER_UI_LOOP = 10;
 
 static void close_files(FILE* input_file, FILE* output_file, FILE* ips_file) {
     if (input_file != NULL) {
@@ -172,16 +173,22 @@ int ui_loop(rombp_patch_command* command) {
         }
 
         switch (hunk_status) {
-            case HUNK_NEXT:
-                hunk_status = next_hunk(patch_type, &patch_ctx, input_file, output_file, patch_file);
-                if (hunk_status == HUNK_NEXT) {
-                    hunk_count++;
-                    rombp_log_info("Got next hunk, hunk count: %d\n", hunk_count);
+            case HUNK_NEXT: {
+                for (int i = 0; i < HUNKS_PER_UI_LOOP; i++) {
+                    hunk_status = next_hunk(patch_type, &patch_ctx, input_file, output_file, patch_file);
+                    if (hunk_status == HUNK_NEXT) {
+                        hunk_count++;
+                        rombp_log_info("Got next hunk, hunk count: %d\n", hunk_count);
 
-                    sprintf(tmp_buf, PATCH_NEXT_MESSAGE, hunk_count);
-                    ui_status_bar_reset_text(&ui, &ui.bottom_bar, tmp_buf);
+                        sprintf(tmp_buf, PATCH_NEXT_MESSAGE, hunk_count);
+                        ui_status_bar_reset_text(&ui, &ui.bottom_bar, tmp_buf);
+                    } else {
+                        break;
+                    }
                 }
+
                 break;
+            }
             case HUNK_DONE:
                 sprintf(tmp_buf, PATCH_SUCCESS_MESSAGE, hunk_count);
                 ui_status_bar_reset_text(&ui, &ui.bottom_bar, tmp_buf);
