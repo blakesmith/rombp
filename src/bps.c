@@ -178,21 +178,25 @@ static rombp_hunk_iter_status bps_target_read(bps_file_header* file_header, uint
         rombp_log_err("Failed to seek target file. err: %d\n", errno);
         return HUNK_ERR_IO;
     }
+
+    uint64_t remaining = length;
+    uint8_t buf[BUF_SIZE];
         
-    for (uint64_t i = 0; i < length; i++) {
-        // Yuck, reading / writing one byte at a time. Speed this up?
-        uint8_t byte;
-        size_t nread = fread(&byte, 1, sizeof(uint8_t), bps_file);
-        if (nread < 1 && ferror(bps_file)) {
+    while (remaining > 0) {
+        uint64_t target_read = MIN(BUF_SIZE, remaining);
+        size_t nread = fread(buf, sizeof(uint8_t), target_read, bps_file);
+        if (nread < target_read && ferror(bps_file)) {
             rombp_log_err("Error during BPS target read, read patch error: %d\n", errno);
             return HUNK_ERR_IO;
         }
         
-        rombp_hunk_iter_status werror = bps_write_output(file_header, output_file, &byte, 1);
+        rombp_hunk_iter_status werror = bps_write_output(file_header, output_file, buf, nread);
         if (werror != HUNK_NEXT) {
             rombp_log_err("Error during BPS target read, write error\n");
             return werror;
         }
+
+        remaining -= nread;
     }
 
     return HUNK_NEXT;
@@ -220,20 +224,23 @@ static rombp_hunk_iter_status bps_source_copy(bps_file_header* file_header, uint
         return HUNK_ERR_IO;
     }
 
-    for (uint64_t i = 0; i < length; i++) {
-        // Yuck, reading / writing one byte at a time. Speed this up?
-        uint8_t byte;
-        size_t nread = fread(&byte, 1, sizeof(uint8_t), input_file);
-        if (nread < 1 && ferror(input_file)) {
+    uint64_t remaining = length;
+    uint8_t buf[BUF_SIZE];
+
+    while (remaining > 0) {
+        uint64_t target_read = MIN(BUF_SIZE, remaining);
+        size_t nread = fread(buf, sizeof(uint8_t), target_read, input_file);
+        if (nread < target_read && ferror(input_file)) {
             rombp_log_err("Error during BPS source read, error: %d\n", errno);
             return HUNK_ERR_IO;
         }
-        rombp_hunk_iter_status werror = bps_write_output(file_header, output_file, &byte, 1);
+        rombp_hunk_iter_status werror = bps_write_output(file_header, output_file, buf, nread);
         if (werror != HUNK_NEXT) {
             rombp_log_err("Error during BPS source copy, write error\n");
             return werror;
         }
-        file_header->source_relative_offset++;
+        file_header->source_relative_offset += nread;
+        remaining -= nread;
     }
 
     return HUNK_NEXT;
@@ -249,18 +256,19 @@ static rombp_hunk_iter_status bps_target_copy(bps_file_header* file_header, uint
     file_header->target_relative_offset += (data & 1 ? -1 : 1) * (data >> 1);
     rombp_log_info("Target relative offset is: %ld\n", file_header->target_relative_offset);
 
-    for (uint64_t i = 0; i < length; i++) {
-        // Yuck, reading / writing one byte at a time. Speed this up?
+    uint64_t remaining = length;
+    uint8_t buf[BUF_SIZE];
 
+    while (remaining > 0) {
         int pos = fseek(output_file, file_header->target_relative_offset, SEEK_SET);
         if (pos == -1) {
             rombp_log_err("Failed to seek target file. err: %d\n", errno);
             return HUNK_ERR_IO;
         }
 
-        uint8_t byte;
-        size_t nread = fread(&byte, 1, sizeof(uint8_t), output_file);
-        if (nread < 1 && ferror(output_file)) {
+        uint64_t target_read = MIN(BUF_SIZE, remaining);
+        size_t nread = fread(buf, sizeof(uint8_t), target_read, output_file);
+        if (nread < target_read && ferror(output_file)) {
             rombp_log_err("Error during BPS target read, error: %d\n", errno);
             return HUNK_ERR_IO;
         }
@@ -271,13 +279,14 @@ static rombp_hunk_iter_status bps_target_copy(bps_file_header* file_header, uint
             return HUNK_ERR_IO;
         }
 
-        rombp_hunk_iter_status werror = bps_write_output(file_header, output_file, &byte, 1);
+        rombp_hunk_iter_status werror = bps_write_output(file_header, output_file, buf, nread);
         if (werror != HUNK_NEXT) {
             rombp_log_err("Error during BPS target copy, write error\n");
             return werror;
         }
 
-        file_header->target_relative_offset++;
+        file_header->target_relative_offset += nread;
+        remaining -= nread;
     }
 
     return HUNK_NEXT;
