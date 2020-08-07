@@ -26,9 +26,9 @@ static const int menu_padding_left_right = 15;
 static const int menu_padding_top_bottom = 25;
 
 static const char* STATUS_BAR_TEXT_ROM = "Select ROM file | A=select, B=quit";
-static const char* STATUS_BAR_TEXT_IPS = "Select IPS file | A=select, B=back";
+static const char* STATUS_BAR_TEXT_PATCH = "Select Patch file | A=select, B=back";
 
-static const char* BOTTOM_BAR_TEXT = "rombp v0.0.1";
+static const char* BOTTOM_BAR_TEXT = "rombp v0.0.2rc";
 
 static inline int get_texture_width(SDL_Texture* texture) {
     int width;
@@ -404,7 +404,7 @@ static int ui_handle_select(rombp_ui* ui, rombp_patch_command* command) {
             ui_status_bar_free(&ui->bottom_bar);
             command->input_file = concat_path(ui->current_directory, selected_item->d_name);
             ui->current_screen = SELECT_IPS;
-            rc = ui_status_bar_reset_text(ui, &ui->nav_bar, STATUS_BAR_TEXT_IPS);
+            rc = ui_status_bar_reset_text(ui, &ui->nav_bar, STATUS_BAR_TEXT_PATCH);
             if (rc != 0) {
                 rombp_log_err("Failed to reset status bar text to IPS: %d\n", rc);
             }
