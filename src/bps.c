@@ -329,5 +329,22 @@ rombp_hunk_iter_status bps_next(bps_file_header* file_header, FILE* input_file, 
 }
 
 rombp_patch_err bps_end(bps_file_header* file_header, FILE* bps_file) {
+    static const size_t footer_items = FOOTER_LENGTH / sizeof(uint32_t);
+    uint32_t footer[footer_items];
+
+    size_t nread = fread(&footer, footer_items, sizeof(uint32_t), bps_file);
+    if (nread < FOOTER_LENGTH && ferror(bps_file)) {
+        rombp_log_err("Error reading BPS footer: %d\n", errno);
+        return PATCH_ERR_IO;
+    }
+
+    uint32_t expected_output_crc32 = footer[1];
+    if (file_header->output_crc32 != expected_output_crc32) {
+        rombp_log_err("Footer output CRC32 and expected CRC32 do not match! Expected: %d, got: %d\n",
+                      expected_output_crc32, file_header->output_crc32);
+        return PATCH_INVALID_OUTPUT_CHECKSUM;
+    }
+
+    rombp_log_info("Output file CRC32 is correct\n");
     return PATCH_OK;
 }
