@@ -17,6 +17,28 @@ typedef enum bps_command_type {
     BPS_TARGET_COPY = 3,
 } bps_command_type;
 
+static uint32_t crc32_for_byte(uint32_t r) {
+    for(int i = 0; i < 8; ++i) {
+        r = (r & 1? 0: (uint32_t)0xEDB88320L) ^ r >> 1;
+    }
+
+    return r ^ (uint32_t)0xFF000000L;
+}
+
+static void crc32(const void *data, size_t n_bytes, uint32_t* crc) {
+    static uint32_t table[0x100];
+
+    if(!*table) {
+        for(size_t i = 0; i < 0x100; ++i) {
+            table[i] = crc32_for_byte(i);
+        }
+    }
+
+    for(size_t i = 0; i < n_bytes; ++i) {
+        *crc = table[(uint8_t)*crc ^ ((uint8_t*)data)[i]] ^ *crc >> 8;
+    }
+}
+
 static int decode_varint(FILE* bps_file, uint64_t* out) {
     uint64_t data = 0;
     uint64_t shift = 1;
@@ -93,8 +115,22 @@ rombp_patch_err bps_start(FILE* bps_file, bps_file_header* file_header) {
     file_header->output_offset = 0;
     file_header->source_relative_offset = 0;
     file_header->target_relative_offset = 0;
+    file_header->output_crc32 = 0;
 
     return PATCH_OK;
+}
+
+static rombp_hunk_iter_status bps_write_output(bps_file_header* file_header, FILE* output_file, uint8_t* buf, size_t len) {
+    size_t nwritten = fwrite(buf, len, sizeof(uint8_t), output_file);
+    if (nwritten < 1 && ferror(output_file)) {
+        rombp_log_err("BPS output write error: %d\n", errno);
+        return HUNK_ERR_IO;
+    }
+
+    crc32(buf, len, &file_header->output_crc32);
+    file_header->output_offset++;
+
+    return HUNK_NEXT;
 }
 
 static rombp_hunk_iter_status bps_source_read(bps_file_header* file_header, uint64_t length, FILE* input_file, FILE* output_file) {
@@ -115,16 +151,15 @@ static rombp_hunk_iter_status bps_source_read(bps_file_header* file_header, uint
         uint8_t byte;
         size_t nread = fread(&byte, 1, sizeof(uint8_t), input_file);
         if (nread < 1 && ferror(input_file)) {
-            rombp_log_err("Error during BPS source read, error: %d\n", ferror(input_file));
+            rombp_log_err("Error during BPS source read, error: %d\n", errno);
             return HUNK_ERR_IO;
         }
-        size_t nwritten = fwrite(&byte, 1, sizeof(uint8_t), output_file);
-        if (nwritten < 1 && ferror(output_file)) {
-            rombp_log_err("Error during BPS source read, write error: %d\n", ferror(output_file));
-            return HUNK_ERR_IO;
+
+        rombp_hunk_iter_status werror = bps_write_output(file_header, output_file, &byte, 1);
+        if (werror != HUNK_NEXT) {
+            rombp_log_err("Error during BPS source read, write error\n");
+            return werror;
         }
-        
-        file_header->output_offset++;
     }
 
     return HUNK_NEXT;
@@ -142,16 +177,15 @@ static rombp_hunk_iter_status bps_target_read(bps_file_header* file_header, uint
         uint8_t byte;
         size_t nread = fread(&byte, 1, sizeof(uint8_t), bps_file);
         if (nread < 1 && ferror(bps_file)) {
-            rombp_log_err("Error during BPS target read, read patch error: %d\n", ferror(bps_file));
-            return HUNK_ERR_IO;
-        }
-        size_t nwritten = fwrite(&byte, 1, sizeof(uint8_t), output_file);
-        if (nwritten < 1 && ferror(output_file)) {
-            rombp_log_err("Error during BPS target read, write error: %d\n", ferror(output_file));
+            rombp_log_err("Error during BPS target read, read patch error: %d\n", errno);
             return HUNK_ERR_IO;
         }
         
-        file_header->output_offset++;
+        rombp_hunk_iter_status werror = bps_write_output(file_header, output_file, &byte, 1);
+        if (werror != HUNK_NEXT) {
+            rombp_log_err("Error during BPS target read, write error\n");
+            return werror;
+        }
     }
 
     return HUNK_NEXT;
@@ -184,16 +218,14 @@ static rombp_hunk_iter_status bps_source_copy(bps_file_header* file_header, uint
         uint8_t byte;
         size_t nread = fread(&byte, 1, sizeof(uint8_t), input_file);
         if (nread < 1 && ferror(input_file)) {
-            rombp_log_err("Error during BPS source read, error: %d\n", ferror(input_file));
+            rombp_log_err("Error during BPS source read, error: %d\n", errno);
             return HUNK_ERR_IO;
         }
-        size_t nwritten = fwrite(&byte, 1, sizeof(uint8_t), output_file);
-        if (nwritten < 1 && ferror(output_file)) {
-            rombp_log_err("Error during BPS source read, write error: %d\n", ferror(output_file));
-            return HUNK_ERR_IO;
+        rombp_hunk_iter_status werror = bps_write_output(file_header, output_file, &byte, 1);
+        if (werror != HUNK_NEXT) {
+            rombp_log_err("Error during BPS source copy, write error\n");
+            return werror;
         }
-
-        file_header->output_offset++;
         file_header->source_relative_offset++;
     }
 
@@ -232,13 +264,12 @@ static rombp_hunk_iter_status bps_target_copy(bps_file_header* file_header, uint
             return HUNK_ERR_IO;
         }
 
-        size_t nwritten = fwrite(&byte, 1, sizeof(uint8_t), output_file);
-        if (nwritten < 1 && ferror(output_file)) {
-            rombp_log_err("Error during BPS source read, write error: %d\n", errno);
-            return HUNK_ERR_IO;
+        rombp_hunk_iter_status werror = bps_write_output(file_header, output_file, &byte, 1);
+        if (werror != HUNK_NEXT) {
+            rombp_log_err("Error during BPS target copy, write error\n");
+            return werror;
         }
 
-        file_header->output_offset++;
         file_header->target_relative_offset++;
     }
 
