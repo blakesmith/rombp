@@ -1,4 +1,5 @@
 #include <errno.h>
+#include <sys/param.h>
 
 #include "bps.h"
 #include "log.h"
@@ -9,6 +10,8 @@ static const uint8_t BPS_EXPECTED_MARKER[] = {
 static const size_t BPS_MARKER_SIZE = sizeof(BPS_EXPECTED_MARKER) / sizeof(uint8_t);
 
 static const size_t FOOTER_LENGTH = 12;
+static const size_t FOOTER_ITEMS = 12 / sizeof(uint32_t);
+static const size_t BUF_SIZE = 32768;
 
 typedef enum bps_command_type {
     BPS_SOURCE_READ = 0,
@@ -47,7 +50,7 @@ static int decode_varint(FILE* bps_file, uint64_t* out) {
         uint8_t ch;
         size_t nread = fread(&ch, 1, sizeof(uint8_t), bps_file);
         if (nread != 1) {
-            rombp_log_err("Failed to read next byte, read: %ld, error code: %d\n", nread, ferror(bps_file));
+            rombp_log_err("Failed to read next byte, read: %ld, error code: %d\n", nread, errno);
             return -1;
         }
         data += (ch & 0x7F) * shift;
@@ -121,14 +124,14 @@ rombp_patch_err bps_start(FILE* bps_file, bps_file_header* file_header) {
 }
 
 static rombp_hunk_iter_status bps_write_output(bps_file_header* file_header, FILE* output_file, uint8_t* buf, size_t len) {
-    size_t nwritten = fwrite(buf, len, sizeof(uint8_t), output_file);
-    if (nwritten < 1 && ferror(output_file)) {
+    size_t nwritten = fwrite(buf, sizeof(uint8_t), len, output_file);
+    if (nwritten < len && ferror(output_file)) {
         rombp_log_err("BPS output write error: %d\n", errno);
         return HUNK_ERR_IO;
     }
 
     crc32(buf, len, &file_header->output_crc32);
-    file_header->output_offset++;
+    file_header->output_offset += len;
 
     return HUNK_NEXT;
 }
@@ -145,21 +148,25 @@ static rombp_hunk_iter_status bps_source_read(bps_file_header* file_header, uint
         rombp_log_err("Failed to seek target file. err: %d\n", errno);
         return HUNK_ERR_IO;
     }
-        
-    for (uint64_t i = 0; i < length; i++) {
-        // Yuck, reading / writing one byte at a time. Speed this up?
-        uint8_t byte;
-        size_t nread = fread(&byte, 1, sizeof(uint8_t), input_file);
-        if (nread < 1 && ferror(input_file)) {
+
+    uint64_t remaining = length;
+    uint8_t buf[BUF_SIZE];
+
+    while (remaining > 0) {
+        uint64_t target_read = MIN(BUF_SIZE, remaining);
+        size_t nread = fread(buf, sizeof(uint8_t), target_read, input_file);
+        if (nread < target_read && ferror(input_file)) {
             rombp_log_err("Error during BPS source read, error: %d\n", errno);
             return HUNK_ERR_IO;
         }
 
-        rombp_hunk_iter_status werror = bps_write_output(file_header, output_file, &byte, 1);
+        rombp_hunk_iter_status werror = bps_write_output(file_header, output_file, buf, nread);
         if (werror != HUNK_NEXT) {
             rombp_log_err("Error during BPS source read, write error\n");
             return werror;
         }
+
+        remaining -= nread;
     }
 
     return HUNK_NEXT;
@@ -329,10 +336,9 @@ rombp_hunk_iter_status bps_next(bps_file_header* file_header, FILE* input_file, 
 }
 
 rombp_patch_err bps_end(bps_file_header* file_header, FILE* bps_file) {
-    static const size_t footer_items = FOOTER_LENGTH / sizeof(uint32_t);
-    uint32_t footer[footer_items];
+    uint32_t footer[FOOTER_ITEMS];
 
-    size_t nread = fread(&footer, footer_items, sizeof(uint32_t), bps_file);
+    size_t nread = fread(&footer, sizeof(uint32_t), FOOTER_ITEMS, bps_file);
     if (nread < FOOTER_LENGTH && ferror(bps_file)) {
         rombp_log_err("Error reading BPS footer: %d\n", errno);
         return PATCH_ERR_IO;
