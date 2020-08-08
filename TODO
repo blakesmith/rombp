@@ -1,2 +1,3 @@
-- Add BPS support
 - Back button goes up a directory, select = quit?
+- Put patching I/O on a separate thread for better performance
+- Add command line usage, optionally excluding SDL from compilation
