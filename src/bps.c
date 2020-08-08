@@ -50,7 +50,7 @@ static int decode_varint(FILE* bps_file, uint64_t* out) {
         uint8_t ch;
         size_t nread = fread(&ch, 1, sizeof(uint8_t), bps_file);
         if (nread != 1) {
-            rombp_log_err("Failed to read next byte, read: %ld, error code: %d\n", nread, errno);
+            rombp_log_err("Failed to read next byte, read: %ld, error code: %d\n", (long)nread, errno);
             return -1;
         }
         data += (ch & 0x7F) * shift;
@@ -337,7 +337,7 @@ rombp_hunk_iter_status bps_next(bps_file_header* file_header, FILE* input_file, 
                                    bps_file);
         }
         default:
-            rombp_log_err("Unknown BPS command: %ld, aborting!\n", command);
+            rombp_log_err("Unknown BPS command: %ld, aborting!\n", (long)command);
             return HUNK_ERR_IO;
     }
 
