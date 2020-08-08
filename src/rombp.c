@@ -6,7 +6,7 @@
 #include "log.h"
 #include "ui.h"
 
-static const char* PATCH_NEXT_MESSAGE = "Patching. Written %d hunks";
+static const char* PATCH_NEXT_MESSAGE = "Patching. Wrote %d hunks";
 static const char* PATCH_SUCCESS_MESSAGE = "Success! Wrote %d hunks";
 static const char* PATCH_FAIL_INVALID_OUTPUT_SIZE_MESSAGE = "ERR: Invalid output size!";
 static const char* PATCH_FAIL_INVALID_OUTPUT_CHECKSUM_MESSAGE = "ERR: Invalid output checksum!";
