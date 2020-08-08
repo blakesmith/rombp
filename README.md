@@ -9,7 +9,7 @@ called
 [OpenDingux](https://wiki.dingoonity.org/index.php?title=OpenDingux:About).
 
 Patch file support:
-- [IPS patch format](http://fileformats.archiveteam.org/wiki/IPS_(binary_patch_format)
+- [IPS patch format](http://fileformats.archiveteam.org/wiki/IPS_(binary_patch_format))
 - [BPS patch format](https://github.com/blakesmith/rombp/blob/master/docs/bps_spec.md)
 
 rombp also runs on desktop Linux (I've only tested it with Ubuntu
