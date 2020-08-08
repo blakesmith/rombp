@@ -19,11 +19,13 @@ console.
 I've only tested with an RG350M, but in theory, it should work with
 other OpenDingux MIPS64 based handhelds as well.
 
-![Desktop screenshot](https://raw.github.com/blakesmith/rombp/master/docs/screenshot.jpg)
-
 Here it is running on the RG350M:
 
 ![RG350M image](https://raw.github.com/blakesmith/rombp/master/docs/rg350m.jpg)
+
+And on Ubuntu Linux:
+
+![Desktop screenshot](https://raw.github.com/blakesmith/rombp/master/docs/screenshot.jpg)
 
 # Installing
 
