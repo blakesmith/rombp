@@ -1,6 +1,6 @@
 # ROM Bin Patcher (rombp)
 
-rombp is a utility program to ROM bin patches, typically used for
+rombp is a utility program to apply ROM bin patches, typically used for
 retro gaming romhacks. I wrote it primarily to target
 the
 [RG350m gaming handheld.](https://obscurehandhelds.com/2020/07/the-anbernic-rg350m-review/),
