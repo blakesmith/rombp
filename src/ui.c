@@ -29,6 +29,7 @@ static const char* STATUS_BAR_TEXT_ROM = "Select ROM file | A=select, B=quit";
 static const char* STATUS_BAR_TEXT_PATCH = "Select Patch file | A=select, B=back";
 
 static const char* BOTTOM_BAR_TEXT = "rombp v0.0.2";
+static const char* BOTTOM_BAR_COULD_NOT_FIND_EXTENSION = "ERR: Could find patch file extension";
 
 static inline int get_texture_width(SDL_Texture* texture) {
     int width;
@@ -357,6 +358,26 @@ static rombp_ui_event ui_handle_back(rombp_ui* ui, rombp_patch_command* command)
     return EV_NONE;
 }
 
+static int find_extension(char* input, char** output, size_t max_size) {
+    // First, jump to the end of the string
+    char *end = input + strlen(input);
+
+    // Then, find the location of the last dot, before the extension name.
+    while (end > input && *end != '.' && *end != '\\' && *end != '/') {
+        --end;
+    }
+
+    // Then, make sure we found the last dot.
+    if ((end > input && *end == '.') &&
+        (*(end - 1) != '\\' && *(end - 1) != '/')) {
+        *output = end;
+        return 0;
+    } else {
+        rombp_log_err("Could not find extension in file: %s\n", input);
+        return -1;
+    }
+}
+
 static int replace_extension(char* input, const char* new_ext, char** output) {
     size_t output_length = strlen(input) + strlen(new_ext) + 1;
     char* out = malloc(output_length);
@@ -415,8 +436,17 @@ static int ui_handle_select(rombp_ui* ui, rombp_patch_command* command) {
                 rombp_log_err("Failed to copy output_path string\n");
                 return -1;
             }
+
+            char* extension;
+            rc = find_extension(command->input_file, &extension, strlen(command->input_file));
+            if (rc != 0) {
+                rombp_log_err("Could not find input file extension: %d\n", rc);
+                ui_status_bar_reset_text(ui, &ui->bottom_bar, BOTTOM_BAR_COULD_NOT_FIND_EXTENSION);
+                return -1;
+            }
+
             char* replaced_extension;
-            rc = replace_extension(copied_output, ".smc", &replaced_extension);
+            rc = replace_extension(copied_output, extension, &replaced_extension);
             if (rc != 0) {
                 rombp_log_err("Failed to replace extension for file: %s\n", copied_output);
                 free(copied_output);
