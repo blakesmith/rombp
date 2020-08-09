@@ -34,6 +34,19 @@ Head over to the
 download the latest OpenDingux OPK file. You should be able to run the
 OPK file just like your other programs.
 
+# Patching a ROM
+
+Patching a ROM is non-destructive, it makes a copy of the ROM file
+before patching it so you can keep your stock ROMs clean.
+
+To patch a ROM:
+
+1. Open rombp and navigate to the source ROM that the patch is based off.
+2. Next, select the IPS / BPS patch file to apply to the ROM.
+3. After selecting the patch file, patching will begin.
+4. Once patching is complete, you will find the patched ROM file in the same directory as the patch file, with the same name as the patch file.
+5. Enjoy playing your ROM hack!
+
 # Building
 
 You'll need to setup your RG350
