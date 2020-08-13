@@ -1,5 +1,6 @@
-#include <stdio.h>
 #include <errno.h>
+#include <stdio.h>
+#include <unistd.h>
 
 #include "bps.h"
 #include "ips.h"
@@ -105,20 +106,20 @@ static rombp_hunk_iter_status next_hunk(rombp_patch_type patch_type, rombp_patch
 
 static rombp_patch_err open_patch_files(FILE** input_file, FILE** output_file, FILE** ips_file, rombp_patch_command* command) {
     *input_file = fopen(command->input_file, "r");
-    if (input_file == NULL) {
+    if (*input_file == NULL) {
         rombp_log_err("Failed to open input file: %s, errno: %d\n", command->input_file, errno);
         return PATCH_ERR_IO;
     }
 
     *output_file = fopen(command->output_file, "w+");
-    if (output_file == NULL) {
+    if (*output_file == NULL) {
         rombp_log_err("Failed to open output file: %d\n", errno);
         close_files(*input_file, NULL, NULL);
         return PATCH_ERR_IO;
     }
 
     *ips_file = fopen(command->ips_file, "r");
-    if (ips_file == NULL) {
+    if (*ips_file == NULL) {
         rombp_log_err("Failed to open IPS file: %d\n", errno);
         close_files(*input_file, *output_file, NULL);
         return PATCH_ERR_IO;
@@ -264,6 +265,137 @@ int ui_loop(rombp_patch_command* command) {
     }
 }
 
+static void display_help() {
+    fprintf(stderr, "rombp: IPS and BPS patcher\n\n");
+    fprintf(stderr, "Usage:\n");
+    fprintf(stderr, "rombp [options]\n\n");
+    fprintf(stderr, "Options:\n");
+    fprintf(stderr, "\t-i [FILE], Input ROM file\n");
+    fprintf(stderr, "\t-p [FILE], IPS or BPS patch file\n");
+    fprintf(stderr, "\t-o [FILE], Patched output file\n\n");
+    fprintf(stderr, "Running rombp with no option arguments launches the SDL UI\n");
+}
+
+static int parse_command_line(int argc, char** argv, rombp_patch_command* command) {
+    int c;
+
+    while ((c = getopt(argc, argv, "i:p:o:")) != -1) {
+        switch (c) {
+            case 'i':
+                command->input_file = optarg;
+                break;
+            case 'p':
+                command->ips_file = optarg;
+                break;
+            case 'o':
+                command->output_file = optarg;
+                break;
+            case '?':
+                display_help();
+                return -1;
+            default:
+                display_help();
+                return -1;
+        }
+    }
+
+    rombp_log_info("rombp arguments. input: %s, patch: %s, output: %s\n",
+                   command->input_file, command->ips_file, command->output_file);
+
+    return 0;
+}
+
+static int execute_patch(rombp_patch_command* command) {
+    int rc;
+    rombp_patch_err err;
+    rombp_patch_type patch_type = PATCH_TYPE_UNKNOWN;
+    rombp_hunk_iter_status hunk_status = HUNK_NONE;
+    int hunk_count = 0;
+    rombp_patch_context patch_ctx;
+
+    FILE* input_file;
+    FILE* output_file;
+    FILE* patch_file;
+
+    err = open_patch_files(&input_file, &output_file, &patch_file, command);
+    if (err == PATCH_ERR_IO) {
+        rombp_log_err("Failed to open files for patching: %d\n", err);
+        return err;
+    }
+    patch_type = detect_patch_type(patch_file);
+    if (patch_type == PATCH_TYPE_UNKNOWN) {
+        rombp_log_err("Bad patch file type: %d\n", patch_type);
+        close_files(input_file, output_file, patch_file);
+        return -1;
+    }
+    rc = start_patch(patch_type, &patch_ctx, input_file, patch_file, output_file);
+    if (rc < 0) {
+        rombp_log_err("Failed to start patching, type: %d\n", patch_type);
+        close_files(input_file, output_file, patch_file);
+        return -1;
+    }
+
+    hunk_count = 0;
+    hunk_status = HUNK_NEXT;
+
+    while (1) {
+        switch (hunk_status) {
+            case HUNK_NEXT: {
+                hunk_status = next_hunk(patch_type, &patch_ctx, input_file, output_file, patch_file);
+                if (hunk_status == HUNK_NEXT) {
+                    hunk_count++;
+                    rombp_log_info("Got next hunk, hunk count: %d\n", hunk_count);
+                } else {
+                    break;
+                }
+
+                break;
+            }
+            case HUNK_DONE: {
+                rombp_patch_err end_err = end_patch(patch_type, &patch_ctx, patch_file);
+                if (end_err == PATCH_OK) {
+                    rombp_log_info("Done patching file, hunk count: %d\n", hunk_count);
+                } else if (end_err == PATCH_INVALID_OUTPUT_SIZE) {
+                    rombp_log_err("Invalid output size\n");
+                } else if (end_err == PATCH_INVALID_OUTPUT_CHECKSUM) {
+                    rombp_log_err("Invalid output checksum\n");
+                } else {
+                    rombp_log_err("Unknown end error: %d\n", end_err);
+                }
+
+                close_files(input_file, output_file, patch_file);
+                return 0;
+            }
+            case HUNK_ERR_IPS:
+                rombp_log_err("Failed to patch file, io error: %d\n", rc);
+                close_files(input_file, output_file, patch_file);
+                return -1;
+            case HUNK_ERR_IO:
+                rombp_log_err("I/O error during hunk iteration\n");
+                close_files(input_file, output_file, patch_file);
+                return -1;
+            case HUNK_NONE:
+                break;
+        }
+    }
+}
+
+static int execute_command_line(int argc, char** argv, rombp_patch_command* command) {
+    int rc;
+
+    rc = parse_command_line(argc, argv, command);
+    if (rc != 0) {
+        return rc;
+    }
+
+    rc = execute_patch(command);
+    if (rc != 0) {
+        return rc;
+    }
+
+    return 0;
+}
+
 int main(int argc, char** argv) {
     rombp_patch_command command;
 
@@ -271,10 +403,16 @@ int main(int argc, char** argv) {
     command.ips_file = NULL;
     command.output_file = NULL;
 
-    int rc = ui_loop(&command);
-    if (rc != 0) {
-        rombp_log_err("Failed to initiate UI loop: %d\n", rc);
-        return -1;
+    if (argc > 1) {
+        // If the user passed command line arguments, assume they don't want to launch
+        // the SDL UI.
+        return execute_command_line(argc, argv, &command);
+    } else {
+        int rc = ui_loop(&command);
+        if (rc != 0) {
+            rombp_log_err("Failed to initiate UI loop: %d\n", rc);
+            return -1;
+        }
     }
 
     return 0;
