@@ -34,6 +34,7 @@ typedef enum rombp_hunk_iter_status {
 // Status that can be shared betwen threads during multi-threaded patching
 typedef struct rombp_patch_status {
     pthread_mutex_t lock;
+    int is_done;
     rombp_hunk_iter_status iter_status;
     rombp_patch_err err;
     int hunk_count;

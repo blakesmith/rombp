@@ -23,6 +23,7 @@ rombp_patch_err patch_verify_marker(FILE* patch_file, const uint8_t* expected_he
 }
 
 void patch_status_init(rombp_patch_status* status) {
+    status->is_done = 0;
     status->iter_status = HUNK_NONE;
     status->err = PATCH_OK;
     status->hunk_count = 0;

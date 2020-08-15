@@ -321,6 +321,22 @@ static void rombp_update_patch_status(rombp_patch_status* shared, rombp_patch_st
     }
 }
 
+static void rombp_read_patch_status(rombp_patch_status* shared, rombp_patch_status* local) {
+    if (shared != NULL && local != NULL) {
+        int rc = pthread_mutex_lock(&shared->lock);
+        if (rc != 0) {
+            rombp_log_err("Failed to lock status mutex: %d\n", rc);
+            exit(-1);
+        }
+        memcpy(local, shared, sizeof(rombp_patch_status));
+        rc = pthread_mutex_unlock(&shared->lock);
+        if (rc != 0) {
+            rombp_log_err("Failed to unlock mutex: %d\n", rc);
+            exit(-1);
+        }
+    }
+}
+
 static int execute_patch(rombp_patch_command* command, rombp_patch_status* status) {
     int rc;
     rombp_patch_type patch_type = PATCH_TYPE_UNKNOWN;
@@ -336,17 +352,17 @@ static int execute_patch(rombp_patch_command* command, rombp_patch_status* statu
     local_status.err = open_patch_files(&input_file, &output_file, &patch_file, command);
     if (local_status.err == PATCH_ERR_IO) {
         rombp_log_err("Failed to open files for patching: %d\n", local_status.err);
-        goto out;
+        goto done;
     }
     patch_type = detect_patch_type(patch_file);
     if (patch_type == PATCH_TYPE_UNKNOWN) {
         rombp_log_err("Bad patch file type: %d\n", patch_type);
-        goto out;
+        goto done;
     }
     rc = start_patch(patch_type, &patch_ctx, input_file, patch_file, output_file);
     if (rc < 0) {
         rombp_log_err("Failed to start patching, type: %d\n", patch_type);
-        goto out;
+        goto done;
     }
     local_status.iter_status = HUNK_NEXT;
 
@@ -374,21 +390,21 @@ static int execute_patch(rombp_patch_command* command, rombp_patch_status* statu
                     rombp_log_err("Unknown end error: %d\n", local_status.err);
                 }
 
-                close_files(input_file, output_file, patch_file);
-                return 0;
+                goto done;
             }
             case HUNK_ERR_IPS:
                 rombp_log_err("Failed to patch file, io error: %d\n", rc);
-                goto out;
+                goto done;
             case HUNK_ERR_IO:
                 rombp_log_err("I/O error during hunk iteration\n");
-                goto out;
+                goto done;
             case HUNK_NONE:
                 break;
         }
     }
 
-out:
+done:
+    local_status.is_done = 1;
     close_files(input_file, output_file, patch_file);
     rombp_update_patch_status(status, &local_status);
     patch_status_destroy(&local_status);
