@@ -380,7 +380,44 @@ static int execute_patch(rombp_patch_command* command) {
     }
 }
 
-static int execute_command_line(int argc, char** argv, rombp_patch_command* command) {
+typedef struct rombp_patch_thread_args {
+    rombp_patch_command* command;
+    rombp_patch_status status;
+    int rc;
+} rombp_patch_thread_args;
+
+static void* execute_patch_threaded(void* args) {
+    rombp_patch_thread_args* patch_args = (rombp_patch_thread_args *)args;
+    int rc = execute_patch(patch_args->command);
+    if (rc != 0) {
+        rombp_log_err("Threaded patch failed: %d\n", rc);
+        patch_args->rc = rc;
+    }
+
+    patch_args->rc = 0;
+    return NULL;
+}
+
+// Start patching on a separate thread
+static int rombp_start_patch_thread(pthread_t* patch_thread, rombp_patch_thread_args* thread_args) {
+    int rc = pthread_create(patch_thread, NULL, &execute_patch_threaded, thread_args);
+    if (rc != 0) {
+        rombp_log_err("Failed to create patching thread: %d\n", rc);
+        return rc;
+    }
+    return 0;
+}
+
+static int rombp_wait_patch_thread(pthread_t* patch_thread) {
+    int rc = pthread_join(*patch_thread, NULL);
+    if (rc != 0) {
+        rombp_log_err("Failed to join patch thread: %d\n", rc);
+        return rc;
+    }
+    return 0;
+}
+
+static int execute_command_line(int argc, char** argv, pthread_t* patch_thread, rombp_patch_command* command) {
     int rc;
 
     rc = parse_command_line(argc, argv, command);
@@ -388,9 +425,26 @@ static int execute_command_line(int argc, char** argv, rombp_patch_command* comm
         return rc;
     }
 
-    rc = execute_patch(command);
+    rombp_patch_thread_args thread_args;
+    thread_args.command = command;
+    thread_args.status.iter_status = HUNK_NEXT;
+    thread_args.status.err = PATCH_OK;
+    thread_args.rc = 0;
+
+    rc = rombp_start_patch_thread(patch_thread, &thread_args);
     if (rc != 0) {
+        rombp_log_err("Could not start patch thread: %d\n", rc);
         return rc;
+    }
+    rc = rombp_wait_patch_thread(patch_thread);
+    if (rc != 0) {
+        rombp_log_err("Could not wait for patch thread to stop: %d\n", rc);
+        return rc;
+    }
+
+    if (thread_args.rc != 0) {
+        rombp_log_err("Patch thread returned non-zero error code: %d\n", thread_args.rc);
+        return thread_args.rc;
     }
 
     return 0;
@@ -398,6 +452,7 @@ static int execute_command_line(int argc, char** argv, rombp_patch_command* comm
 
 int main(int argc, char** argv) {
     rombp_patch_command command;
+    pthread_t patch_thread;
 
     command.input_file = NULL;
     command.ips_file = NULL;
@@ -406,7 +461,7 @@ int main(int argc, char** argv) {
     if (argc > 1) {
         // If the user passed command line arguments, assume they don't want to launch
         // the SDL UI.
-        return execute_command_line(argc, argv, &command);
+        return execute_command_line(argc, argv, &patch_thread, &command);
     } else {
         int rc = ui_loop(&command);
         if (rc != 0) {
