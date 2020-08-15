@@ -305,6 +305,22 @@ static int parse_command_line(int argc, char** argv, rombp_patch_command* comman
     return 0;
 }
 
+static void rombp_update_patch_status(rombp_patch_status* shared, rombp_patch_status* local) {
+    if (shared != NULL && local != NULL) {
+        int rc = pthread_mutex_lock(&shared->lock);
+        if (rc != 0) {
+            rombp_log_err("Failed to lock status mutex: %d\n", rc);
+            exit(-1);
+        }
+        memcpy(shared, local, sizeof(rombp_patch_status));
+        rc = pthread_mutex_unlock(&shared->lock);
+        if (rc != 0) {
+            rombp_log_err("Failed to unlock mutex: %d\n", rc);
+            exit(-1);
+        }
+    }
+}
+
 static int execute_patch(rombp_patch_command* command, rombp_patch_status* status) {
     int rc;
     rombp_patch_type patch_type = PATCH_TYPE_UNKNOWN;
@@ -315,22 +331,22 @@ static int execute_patch(rombp_patch_command* command, rombp_patch_status* statu
     FILE* output_file;
     FILE* patch_file;
 
+    patch_status_init(&local_status);
+
     local_status.err = open_patch_files(&input_file, &output_file, &patch_file, command);
     if (local_status.err == PATCH_ERR_IO) {
         rombp_log_err("Failed to open files for patching: %d\n", local_status.err);
-        return local_status.err;
+        goto out;
     }
     patch_type = detect_patch_type(patch_file);
     if (patch_type == PATCH_TYPE_UNKNOWN) {
         rombp_log_err("Bad patch file type: %d\n", patch_type);
-        close_files(input_file, output_file, patch_file);
-        return -1;
+        goto out;
     }
     rc = start_patch(patch_type, &patch_ctx, input_file, patch_file, output_file);
     if (rc < 0) {
         rombp_log_err("Failed to start patching, type: %d\n", patch_type);
-        close_files(input_file, output_file, patch_file);
-        return -1;
+        goto out;
     }
     local_status.iter_status = HUNK_NEXT;
 
@@ -341,10 +357,9 @@ static int execute_patch(rombp_patch_command* command, rombp_patch_status* statu
                 if (local_status.iter_status == HUNK_NEXT) {
                     local_status.hunk_count++;
                     rombp_log_info("Got next hunk, hunk count: %d\n", local_status.hunk_count);
-                } else {
-                    break;
                 }
-
+                
+                rombp_update_patch_status(status, &local_status);
                 break;
             }
             case HUNK_DONE: {
@@ -364,16 +379,20 @@ static int execute_patch(rombp_patch_command* command, rombp_patch_status* statu
             }
             case HUNK_ERR_IPS:
                 rombp_log_err("Failed to patch file, io error: %d\n", rc);
-                close_files(input_file, output_file, patch_file);
-                return -1;
+                goto out;
             case HUNK_ERR_IO:
                 rombp_log_err("I/O error during hunk iteration\n");
-                close_files(input_file, output_file, patch_file);
-                return -1;
+                goto out;
             case HUNK_NONE:
                 break;
         }
     }
+
+out:
+    close_files(input_file, output_file, patch_file);
+    rombp_update_patch_status(status, &local_status);
+    patch_status_destroy(&local_status);
+    return -1;
 }
 
 typedef struct rombp_patch_thread_args {
@@ -441,6 +460,8 @@ static int execute_command_line(int argc, char** argv, pthread_t* patch_thread, 
         rombp_log_err("Patch thread returned non-zero error code: %d\n", thread_args.rc);
         return thread_args.rc;
     }
+
+    patch_status_destroy(&thread_args.status);
 
     return 0;
 }

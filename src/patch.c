@@ -1,3 +1,5 @@
+#include <stdlib.h>
+
 #include "log.h"
 #include "patch.h"
 
@@ -24,5 +26,18 @@ void patch_status_init(rombp_patch_status* status) {
     status->iter_status = HUNK_NONE;
     status->err = PATCH_OK;
     status->hunk_count = 0;
+
+    int rc = pthread_mutex_init(&status->lock, NULL);
+    if (rc != 0) {
+        rombp_log_err("Failed to initalize mutex: %d\n", rc);
+        exit(-1);
+    }
+}
+
+void patch_status_destroy(rombp_patch_status* status) {
+    int rc = pthread_mutex_destroy(&status->lock);
+    if (rc != 0) {
+        rombp_log_err("Failed to destroy mutex: %d\n", rc);
+    }
 }
 
