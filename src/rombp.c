@@ -307,7 +307,6 @@ static int parse_command_line(int argc, char** argv, rombp_patch_command* comman
 
 static int execute_patch(rombp_patch_command* command, rombp_patch_status* status) {
     int rc;
-    rombp_patch_err err;
     rombp_patch_type patch_type = PATCH_TYPE_UNKNOWN;
     rombp_patch_context patch_ctx;
     rombp_patch_status local_status;
@@ -316,10 +315,10 @@ static int execute_patch(rombp_patch_command* command, rombp_patch_status* statu
     FILE* output_file;
     FILE* patch_file;
 
-    err = open_patch_files(&input_file, &output_file, &patch_file, command);
-    if (err == PATCH_ERR_IO) {
-        rombp_log_err("Failed to open files for patching: %d\n", err);
-        return err;
+    local_status.err = open_patch_files(&input_file, &output_file, &patch_file, command);
+    if (local_status.err == PATCH_ERR_IO) {
+        rombp_log_err("Failed to open files for patching: %d\n", local_status.err);
+        return local_status.err;
     }
     patch_type = detect_patch_type(patch_file);
     if (patch_type == PATCH_TYPE_UNKNOWN) {
