@@ -348,15 +348,15 @@ static int execute_patch(rombp_patch_command* command, rombp_patch_status* statu
                 break;
             }
             case HUNK_DONE: {
-                rombp_patch_err end_err = end_patch(patch_type, &patch_ctx, patch_file);
-                if (end_err == PATCH_OK) {
+                local_status.err = end_patch(patch_type, &patch_ctx, patch_file);
+                if (local_status.err == PATCH_OK) {
                     rombp_log_info("Done patching file, hunk count: %d\n", local_status.hunk_count);
-                } else if (end_err == PATCH_INVALID_OUTPUT_SIZE) {
+                } else if (local_status.err == PATCH_INVALID_OUTPUT_SIZE) {
                     rombp_log_err("Invalid output size\n");
-                } else if (end_err == PATCH_INVALID_OUTPUT_CHECKSUM) {
+                } else if (local_status.err == PATCH_INVALID_OUTPUT_CHECKSUM) {
                     rombp_log_err("Invalid output checksum\n");
                 } else {
-                    rombp_log_err("Unknown end error: %d\n", end_err);
+                    rombp_log_err("Unknown end error: %d\n", local_status.err);
                 }
 
                 close_files(input_file, output_file, patch_file);
