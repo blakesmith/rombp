@@ -35,8 +35,10 @@ typedef enum rombp_hunk_iter_status {
 typedef struct rombp_patch_status {
     rombp_hunk_iter_status iter_status;
     rombp_patch_err err;
+    int hunk_count;
 } rombp_patch_status;
 
 rombp_patch_err patch_verify_marker(FILE* patch_file, const uint8_t* expected_header, const size_t header_size);
+void patch_status_init(rombp_patch_status* status);
 
 #endif

@@ -305,13 +305,12 @@ static int parse_command_line(int argc, char** argv, rombp_patch_command* comman
     return 0;
 }
 
-static int execute_patch(rombp_patch_command* command) {
+static int execute_patch(rombp_patch_command* command, rombp_patch_status* status) {
     int rc;
     rombp_patch_err err;
     rombp_patch_type patch_type = PATCH_TYPE_UNKNOWN;
-    rombp_hunk_iter_status hunk_status = HUNK_NONE;
-    int hunk_count = 0;
     rombp_patch_context patch_ctx;
+    rombp_patch_status local_status;
 
     FILE* input_file;
     FILE* output_file;
@@ -334,17 +333,15 @@ static int execute_patch(rombp_patch_command* command) {
         close_files(input_file, output_file, patch_file);
         return -1;
     }
-
-    hunk_count = 0;
-    hunk_status = HUNK_NEXT;
+    local_status.iter_status = HUNK_NEXT;
 
     while (1) {
-        switch (hunk_status) {
+        switch (local_status.iter_status) {
             case HUNK_NEXT: {
-                hunk_status = next_hunk(patch_type, &patch_ctx, input_file, output_file, patch_file);
-                if (hunk_status == HUNK_NEXT) {
-                    hunk_count++;
-                    rombp_log_info("Got next hunk, hunk count: %d\n", hunk_count);
+                local_status.iter_status = next_hunk(patch_type, &patch_ctx, input_file, output_file, patch_file);
+                if (local_status.iter_status == HUNK_NEXT) {
+                    local_status.hunk_count++;
+                    rombp_log_info("Got next hunk, hunk count: %d\n", local_status.hunk_count);
                 } else {
                     break;
                 }
@@ -354,7 +351,7 @@ static int execute_patch(rombp_patch_command* command) {
             case HUNK_DONE: {
                 rombp_patch_err end_err = end_patch(patch_type, &patch_ctx, patch_file);
                 if (end_err == PATCH_OK) {
-                    rombp_log_info("Done patching file, hunk count: %d\n", hunk_count);
+                    rombp_log_info("Done patching file, hunk count: %d\n", local_status.hunk_count);
                 } else if (end_err == PATCH_INVALID_OUTPUT_SIZE) {
                     rombp_log_err("Invalid output size\n");
                 } else if (end_err == PATCH_INVALID_OUTPUT_CHECKSUM) {
@@ -388,7 +385,7 @@ typedef struct rombp_patch_thread_args {
 
 static void* execute_patch_threaded(void* args) {
     rombp_patch_thread_args* patch_args = (rombp_patch_thread_args *)args;
-    int rc = execute_patch(patch_args->command);
+    int rc = execute_patch(patch_args->command, NULL);
     if (rc != 0) {
         rombp_log_err("Threaded patch failed: %d\n", rc);
         patch_args->rc = rc;
@@ -427,9 +424,8 @@ static int execute_command_line(int argc, char** argv, pthread_t* patch_thread, 
 
     rombp_patch_thread_args thread_args;
     thread_args.command = command;
-    thread_args.status.iter_status = HUNK_NEXT;
-    thread_args.status.err = PATCH_OK;
     thread_args.rc = 0;
+    patch_status_init(&thread_args.status);
 
     rc = rombp_start_patch_thread(patch_thread, &thread_args);
     if (rc != 0) {
