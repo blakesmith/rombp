@@ -229,16 +229,6 @@ int ui_loop(rombp_patch_command* command) {
                 sleep_delay = DEFAULT_SLEEP;
                 break;
             }
-            case HUNK_ERR_IPS:
-                ui_status_bar_reset_text(&ui, &ui.bottom_bar, "ERROR: Cannot write ROM");
-                rombp_log_err("Failed to patch file, io error: %d\n", rc);
-
-                close_files(input_file, output_file, patch_file);
-                ui_free_command(command);
-                
-                hunk_status = HUNK_NONE;
-                sleep_delay = DEFAULT_SLEEP;
-                break;
             case HUNK_ERR_IO:
                 ui_status_bar_reset_text(&ui, &ui.bottom_bar, "ERROR: IO error decoding next patch hunk");
                 rombp_log_err("I/O error during hunk iteration\n");
@@ -351,17 +341,16 @@ static int execute_patch(rombp_patch_command* command, rombp_patch_status* statu
 
     local_status.err = open_patch_files(&input_file, &output_file, &patch_file, command);
     if (local_status.err == PATCH_ERR_IO) {
-        rombp_log_err("Failed to open files for patching: %d\n", local_status.err);
         goto done;
     }
     patch_type = detect_patch_type(patch_file);
     if (patch_type == PATCH_TYPE_UNKNOWN) {
-        rombp_log_err("Bad patch file type: %d\n", patch_type);
+        local_status.err = PATCH_UNKNOWN_TYPE;
         goto done;
     }
     rc = start_patch(patch_type, &patch_ctx, input_file, patch_file, output_file);
     if (rc < 0) {
-        rombp_log_err("Failed to start patching, type: %d\n", patch_type);
+        local_status.err = PATCH_FAILED_TO_START;
         goto done;
     }
     local_status.iter_status = HUNK_NEXT;
@@ -380,22 +369,10 @@ static int execute_patch(rombp_patch_command* command, rombp_patch_status* statu
             }
             case HUNK_DONE: {
                 local_status.err = end_patch(patch_type, &patch_ctx, patch_file);
-                if (local_status.err == PATCH_OK) {
-                    rombp_log_info("Done patching file, hunk count: %d\n", local_status.hunk_count);
-                } else if (local_status.err == PATCH_INVALID_OUTPUT_SIZE) {
-                    rombp_log_err("Invalid output size\n");
-                } else if (local_status.err == PATCH_INVALID_OUTPUT_CHECKSUM) {
-                    rombp_log_err("Invalid output checksum\n");
-                } else {
-                    rombp_log_err("Unknown end error: %d\n", local_status.err);
-                }
-
                 goto done;
             }
-            case HUNK_ERR_IPS:
-                rombp_log_err("Failed to patch file, io error: %d\n", rc);
-                goto done;
             case HUNK_ERR_IO:
+                local_status.err = PATCH_ERR_IO;
                 rombp_log_err("I/O error during hunk iteration\n");
                 goto done;
             case HUNK_NONE:
@@ -408,7 +385,7 @@ done:
     close_files(input_file, output_file, patch_file);
     rombp_update_patch_status(status, &local_status);
     patch_status_destroy(&local_status);
-    return -1;
+    return local_status.err;
 }
 
 typedef struct rombp_patch_thread_args {
@@ -419,7 +396,7 @@ typedef struct rombp_patch_thread_args {
 
 static void* execute_patch_threaded(void* args) {
     rombp_patch_thread_args* patch_args = (rombp_patch_thread_args *)args;
-    int rc = execute_patch(patch_args->command, NULL);
+    int rc = execute_patch(patch_args->command, &patch_args->status);
     if (rc != 0) {
         rombp_log_err("Threaded patch failed: %d\n", rc);
         patch_args->rc = rc;
@@ -472,9 +449,38 @@ static int execute_command_line(int argc, char** argv, pthread_t* patch_thread, 
         return rc;
     }
 
+    if (!thread_args.status.is_done) {
+        rombp_log_err("Illegal state: The patching thread terminated, but did not register itself as done\n");
+        return -1;
+    }
+
     if (thread_args.rc != 0) {
         rombp_log_err("Patch thread returned non-zero error code: %d\n", thread_args.rc);
         return thread_args.rc;
+    }
+
+    switch (thread_args.status.err) {
+        case PATCH_OK:
+            rombp_log_info("Done patching file, hunk count: %d\n", thread_args.status.hunk_count);
+            break;
+        case PATCH_INVALID_OUTPUT_SIZE:
+            rombp_log_err("Invalid output size\n");
+            break;
+        case PATCH_INVALID_OUTPUT_CHECKSUM:
+            rombp_log_err("Invalid output checksum\n");
+            break;
+        case PATCH_ERR_IO:
+            rombp_log_err("Failed to open files for patching: %d\n", thread_args.status.err);
+            break;
+        case PATCH_UNKNOWN_TYPE:
+            rombp_log_err("Bad patch file type\n");
+            break;
+        case PATCH_FAILED_TO_START:
+            rombp_log_err("Failed to start patching\n");
+            break;
+        default:
+            rombp_log_err("Unknown end error: %d\n", thread_args.status.err);
+            break;
     }
 
     patch_status_destroy(&thread_args.status);

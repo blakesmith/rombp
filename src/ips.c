@@ -122,7 +122,7 @@ static int ips_next_hunk_header(FILE* ips_file, ips_hunk_header* header) {
         int err = ferror(ips_file);
         if (err != 0) {
             rombp_log_err("Error reading from IPS file, error: %d\n", err);
-            return HUNK_ERR_IPS;
+            return HUNK_ERR_IO;
         }
         if (feof(ips_file) != 0) {
             return HUNK_DONE;
@@ -240,7 +240,7 @@ rombp_hunk_iter_status ips_next(FILE* input_file, FILE* output_file, FILE* ips_f
     int rc = ips_next_hunk_header(ips_file, &hunk_header);
     if (rc < 0) {
         rombp_log_err("Error getting next hunk, at hunk count: %d\n", rc);
-        return HUNK_ERR_IPS;
+        return HUNK_ERR_IO;
     } else if (rc == HUNK_DONE) {
         return HUNK_DONE;
     } else {
@@ -248,7 +248,7 @@ rombp_hunk_iter_status ips_next(FILE* input_file, FILE* output_file, FILE* ips_f
         rc = ips_patch_hunk(&hunk_header, input_file, output_file, ips_file);
         if (rc < 0) {
             rombp_log_err("Failed to patch next hunk: %d\n", rc);
-            return HUNK_ERR_IPS;
+            return HUNK_ERR_IO;
         }
 
         return HUNK_NEXT;

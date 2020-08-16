@@ -20,12 +20,13 @@ typedef enum rombp_patch_err {
     PATCH_INVALID_OUTPUT_SIZE = -4,
     PATCH_INVALID_INPUT_CHECKSUM = -5,
     PATCH_INVALID_OUTPUT_CHECKSUM = -6,
+    PATCH_UNKNOWN_TYPE = -7,
+    PATCH_FAILED_TO_START = -8,
 } rombp_patch_err;
 
 // Status code used during hunk iteration.
 typedef enum rombp_hunk_iter_status {
-    HUNK_ERR_IO = -2,
-    HUNK_ERR_IPS = -1,
+    HUNK_ERR_IO = -1,
     HUNK_NONE = 0,
     HUNK_DONE = 1,
     HUNK_NEXT = 2,
