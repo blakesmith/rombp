@@ -259,8 +259,9 @@ done:
     local_status.is_done = 1;
     close_files(input_file, output_file, patch_file);
     rombp_update_patch_status(status, &local_status);
+    rombp_patch_err err = local_status.err;
     patch_status_destroy(&local_status);
-    return local_status.err;
+    return err;
 }
 
 typedef struct rombp_patch_thread_args {
@@ -302,6 +303,7 @@ static int rombp_wait_patch_thread(pthread_t* patch_thread) {
 
 static int ui_loop(pthread_t* patch_thread, rombp_patch_command* command) {
     rombp_ui ui;
+    int patching = 0;
     char tmp_buf[255];
     rombp_patch_status local_status;
 
@@ -332,64 +334,72 @@ static int ui_loop(pthread_t* patch_thread, rombp_patch_command* command) {
                     rombp_log_err("FATAL: Failed to start patch thread: %d\n", rc);
                     goto out;
                 }
+                patching = 1;
+                break;
             default:
                 break;
         }
 
-        // Then, copy thread status to a local struct so we can check its current state
-        rombp_read_patch_status(&thread_args.status, &local_status);
-        switch (local_status.iter_status) {
-            case HUNK_NONE:
-                break;
-            case HUNK_NEXT:
-                sprintf(tmp_buf, PATCH_NEXT_MESSAGE, local_status.hunk_count);
-                ui_status_bar_reset_text(&ui, &ui.bottom_bar, tmp_buf);
-            case HUNK_DONE:
-                if (local_status.is_done) {
-                    switch (local_status.err) {
-                        case PATCH_OK:
-                            sprintf(tmp_buf, PATCH_SUCCESS_MESSAGE, local_status.hunk_count);
-                            ui_status_bar_reset_text(&ui, &ui.bottom_bar, tmp_buf);
-                            rombp_log_info("Done patching file, hunk count: %d\n", thread_args.status.hunk_count);
-                            break;
-                        case PATCH_INVALID_OUTPUT_SIZE:
-                            ui_status_bar_reset_text(&ui, &ui.bottom_bar, PATCH_FAIL_INVALID_OUTPUT_SIZE_MESSAGE);
-                            rombp_log_err("Invalid output size\n");
-                            break;
-                        case PATCH_INVALID_OUTPUT_CHECKSUM:
-                            ui_status_bar_reset_text(&ui, &ui.bottom_bar, PATCH_FAIL_INVALID_OUTPUT_CHECKSUM_MESSAGE);
-                            rombp_log_err("Invalid output checksum\n");
-                            break;
-                        case PATCH_ERR_IO:
-                            ui_status_bar_reset_text(&ui, &ui.bottom_bar, PATCH_FAIL_ERR_IO);
-                            rombp_log_err("Failed to open files for patching: %d\n", thread_args.status.err);
-                            break;
-                        case PATCH_UNKNOWN_TYPE:
-                            ui_status_bar_reset_text(&ui, &ui.bottom_bar, PATCH_FAIL_UNKNOWN_TYPE);
-                            rombp_log_err("Bad patch file type\n");
-                            break;
-                        case PATCH_FAILED_TO_START:
-                            ui_status_bar_reset_text(&ui, &ui.bottom_bar, PATCH_FAIL_START);
-                            rombp_log_err("Failed to start patching\n");
-                            break;
-                        default:
-                            ui_status_bar_reset_text(&ui, &ui.bottom_bar, PATCH_UNKNOWN_ERROR_MESSAGE);
-                            rombp_log_err("Unknown end error: %d\n", thread_args.status.err);
-                            break;
+        // Then, if we're patching, copy thread status to a local struct so we can check its current state
+        if (patching) {
+            rombp_read_patch_status(&thread_args.status, &local_status);
+            switch (local_status.iter_status) {
+                case HUNK_NEXT:
+                    sprintf(tmp_buf, PATCH_NEXT_MESSAGE, local_status.hunk_count);
+                    ui_status_bar_reset_text(&ui, &ui.bottom_bar, tmp_buf);
+                    break;
+                case HUNK_DONE:
+                    if (local_status.is_done) {
+                        switch (local_status.err) {
+                            case PATCH_OK:
+                                sprintf(tmp_buf, PATCH_SUCCESS_MESSAGE, local_status.hunk_count);
+                                ui_status_bar_reset_text(&ui, &ui.bottom_bar, tmp_buf);
+                                rombp_log_info("Done patching file, hunk count: %d\n", thread_args.status.hunk_count);
+                                break;
+                            case PATCH_INVALID_OUTPUT_SIZE:
+                                ui_status_bar_reset_text(&ui, &ui.bottom_bar, PATCH_FAIL_INVALID_OUTPUT_SIZE_MESSAGE);
+                                rombp_log_err("Invalid output size\n");
+                                break;
+                            case PATCH_INVALID_OUTPUT_CHECKSUM:
+                                ui_status_bar_reset_text(&ui, &ui.bottom_bar, PATCH_FAIL_INVALID_OUTPUT_CHECKSUM_MESSAGE);
+                                rombp_log_err("Invalid output checksum\n");
+                                break;
+                            case PATCH_ERR_IO:
+                                ui_status_bar_reset_text(&ui, &ui.bottom_bar, PATCH_FAIL_ERR_IO);
+                                rombp_log_err("Failed to open files for patching: %d\n", thread_args.status.err);
+                                break;
+                            case PATCH_UNKNOWN_TYPE:
+                                ui_status_bar_reset_text(&ui, &ui.bottom_bar, PATCH_FAIL_UNKNOWN_TYPE);
+                                rombp_log_err("Bad patch file type\n");
+                                break;
+                            case PATCH_FAILED_TO_START:
+                                ui_status_bar_reset_text(&ui, &ui.bottom_bar, PATCH_FAIL_START);
+                                rombp_log_err("Failed to start patching\n");
+                                break;
+                            default:
+                                ui_status_bar_reset_text(&ui, &ui.bottom_bar, PATCH_UNKNOWN_ERROR_MESSAGE);
+                                rombp_log_err("Unknown end error: %d\n", thread_args.status.err);
+                                break;
+                        }
+                        rc = rombp_wait_patch_thread(patch_thread);
+                        if (rc != 0) {
+                            rombp_log_err("Could not wait for patch thread to stop: %d\n", rc);
+                            return rc;
+                        }
+                        ui_free_command(command);
+                        patching = 0;
+                        break;
                     }
-                }
-                rc = rombp_wait_patch_thread(patch_thread);
-                if (rc != 0) {
-                    rombp_log_err("Could not wait for patch thread to stop: %d\n", rc);
-                    return rc;
-                }
-                ui_free_command(command);
-            case HUNK_ERR_IO:
-                ui_status_bar_reset_text(&ui, &ui.bottom_bar, "ERROR: IO error decoding next patch hunk");
-                rombp_log_err("I/O error during hunk iteration\n");
-                ui_free_command(command);
-            default:
-                break;
+                case HUNK_ERR_IO:
+                    ui_status_bar_reset_text(&ui, &ui.bottom_bar, "ERROR: IO error decoding next patch hunk");
+                    rombp_log_err("I/O error during hunk iteration\n");
+                    ui_free_command(command);
+                    patching = 0;
+                    break;
+                case HUNK_NONE:
+                default:
+                    break;
+            }
         }
 
         rc = ui_draw(&ui);
