@@ -329,6 +329,7 @@ static int ui_loop(pthread_t* patch_thread, rombp_patch_command* command) {
                 rc = 0;
                 goto out;
             case EV_PATCH_COMMAND:
+                patch_status_reset(&thread_args.status);
                 rc = rombp_start_patch_thread(patch_thread, &thread_args);
                 if (rc != 0) {
                     rombp_log_err("FATAL: Failed to start patch thread: %d\n", rc);
@@ -405,7 +406,7 @@ static int ui_loop(pthread_t* patch_thread, rombp_patch_command* command) {
         rc = ui_draw(&ui);
         if (rc != 0) {
             rombp_log_err("Failed to draw: %d\n", rc);
-            return rc;
+            goto out;
         }
 
         SDL_Delay(DEFAULT_SLEEP);

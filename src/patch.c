@@ -22,12 +22,15 @@ rombp_patch_err patch_verify_marker(FILE* patch_file, const uint8_t* expected_he
     return PATCH_OK;
 }
 
-void patch_status_init(rombp_patch_status* status) {
+void patch_status_reset(rombp_patch_status* status) {
     status->is_done = 0;
     status->iter_status = HUNK_NONE;
     status->err = PATCH_OK;
     status->hunk_count = 0;
+}
 
+void patch_status_init(rombp_patch_status* status) {
+    patch_status_reset(status);
     int rc = pthread_mutex_init(&status->lock, NULL);
     if (rc != 0) {
         rombp_log_err("Failed to initalize mutex: %d\n", rc);
