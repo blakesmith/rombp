@@ -46,7 +46,7 @@ static int decode_varint(FILE* bps_file, uint64_t* out) {
     uint64_t data = 0;
     uint64_t shift = 1;
 
-    while (1) {
+    for (int i = 0; i < sizeof(uint64_t); i++) {
         uint8_t ch;
         size_t nread = fread(&ch, 1, sizeof(uint8_t), bps_file);
         if (nread != 1) {
