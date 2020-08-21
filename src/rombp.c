@@ -177,7 +177,7 @@ static void rombp_update_patch_status(rombp_patch_status* shared, rombp_patch_st
             rombp_log_err("Failed to lock status mutex: %d\n", rc);
             exit(-1);
         }
-        memcpy(shared, local, sizeof(rombp_patch_status));
+        patch_status_copy(shared, local);
         rc = pthread_mutex_unlock(&shared->lock);
         if (rc != 0) {
             rombp_log_err("Failed to unlock mutex: %d\n", rc);
@@ -193,7 +193,7 @@ static void rombp_read_patch_status(rombp_patch_status* shared, rombp_patch_stat
             rombp_log_err("Failed to lock status mutex: %d\n", rc);
             exit(-1);
         }
-        memcpy(local, shared, sizeof(rombp_patch_status));
+        patch_status_copy(local, shared);
         rc = pthread_mutex_unlock(&shared->lock);
         if (rc != 0) {
             rombp_log_err("Failed to unlock mutex: %d\n", rc);

@@ -43,6 +43,7 @@ typedef struct rombp_patch_status {
 
 rombp_patch_err patch_verify_marker(FILE* patch_file, const uint8_t* expected_header, const size_t header_size);
 void patch_status_init(rombp_patch_status* status);
+void patch_status_copy(rombp_patch_status* dest, rombp_patch_status* src);
 void patch_status_reset(rombp_patch_status* status);
 void patch_status_destroy(rombp_patch_status* status);
 

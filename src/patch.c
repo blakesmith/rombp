@@ -38,6 +38,14 @@ void patch_status_init(rombp_patch_status* status) {
     }
 }
 
+void patch_status_copy(rombp_patch_status* dest, rombp_patch_status* src) {
+    // Copy fields manually, to avoid copying the mutex
+    dest->is_done = src->is_done;
+    dest->iter_status = src->iter_status;
+    dest->err = src->err;
+    dest->hunk_count = src->hunk_count;
+}
+
 void patch_status_destroy(rombp_patch_status* status) {
     int rc = pthread_mutex_destroy(&status->lock);
     if (rc != 0) {
