@@ -47,6 +47,31 @@ To patch a ROM:
 4. Once patching is complete, you will find the patched ROM file in the same directory as the patch file, with the same name as the patch file.
 5. Enjoy playing your ROM hack!
 
+# Command Line Usage
+
+rombp can also be executed from the command line to select input ROM
+and patch file, rather than using the SDL2 file UI. Arguments are:
+
+```
+rombp: IPS and BPS patcher
+
+Usage:
+rombp [options]
+
+Options:
+        -i [FILE], Input ROM file
+        -p [FILE], IPS or BPS patch file
+        -o [FILE], Patched output file
+
+Running rombp with no option arguments launches the SDL UI
+```
+
+Example usage:
+
+```
+./rombp -i Awesome_Rom.smc -p Cool_Hack.bps -o Cool_Hack.smc
+```
+
 # Building
 
 You'll need to setup your RG350

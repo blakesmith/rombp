@@ -1,3 +1,2 @@
 - Back button goes up a directory, select = quit?
-- Put patching I/O on a separate thread for better performance
 - Optionally excluding SDL from compilation
