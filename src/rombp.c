@@ -216,15 +216,18 @@ static int execute_patch(rombp_patch_command* command, rombp_patch_status* statu
 
     local_status.err = open_patch_files(&input_file, &output_file, &patch_file, command);
     if (local_status.err == PATCH_ERR_IO) {
+        local_status.iter_status = HUNK_DONE;
         goto done;
     }
     patch_type = detect_patch_type(patch_file);
     if (patch_type == PATCH_TYPE_UNKNOWN) {
+        local_status.iter_status = HUNK_DONE;
         local_status.err = PATCH_UNKNOWN_TYPE;
         goto done;
     }
     rc = start_patch(patch_type, &patch_ctx, input_file, patch_file, output_file);
     if (rc < 0) {
+        local_status.iter_status = HUNK_DONE;
         local_status.err = PATCH_FAILED_TO_START;
         goto done;
     }
@@ -257,7 +260,6 @@ static int execute_patch(rombp_patch_command* command, rombp_patch_status* statu
 
 done:
     local_status.is_done = 1;
-    local_status.iter_status = HUNK_DONE;
     close_files(input_file, output_file, patch_file);
     rombp_update_patch_status(status, &local_status);
     rombp_patch_err err = local_status.err;
