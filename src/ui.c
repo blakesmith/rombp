@@ -28,7 +28,7 @@ static const int menu_padding_top_bottom = 25;
 static const char* STATUS_BAR_TEXT_ROM = "Select ROM file | A=select, B=quit";
 static const char* STATUS_BAR_TEXT_PATCH = "Select Patch file | A=select, B=back";
 
-static const char* BOTTOM_BAR_TEXT = "rombp v0.0.3";
+static const char* BOTTOM_BAR_TEXT = "rombp v0.0.4";
 static const char* BOTTOM_BAR_COULD_NOT_FIND_EXTENSION = "ERR: Could find patch file extension";
 
 static inline int get_texture_width(SDL_Texture* texture) {
