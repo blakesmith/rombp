@@ -257,6 +257,7 @@ static int execute_patch(rombp_patch_command* command, rombp_patch_status* statu
 
 done:
     local_status.is_done = 1;
+    local_status.iter_status = HUNK_DONE;
     close_files(input_file, output_file, patch_file);
     rombp_update_patch_status(status, &local_status);
     rombp_patch_err err = local_status.err;
@@ -275,10 +276,9 @@ static void* execute_patch_threaded(void* args) {
     int rc = execute_patch(patch_args->command, &patch_args->status);
     if (rc != 0) {
         rombp_log_err("Threaded patch failed: %d\n", rc);
-        patch_args->rc = rc;
     }
 
-    patch_args->rc = 0;
+    patch_args->rc = rc;
     return NULL;
 }
 
