@@ -391,8 +391,8 @@ static int ui_loop(pthread_t* patch_thread, rombp_patch_command* command) {
                         }
                         ui_free_command(command);
                         patching = 0;
-                        break;
                     }
+                    break;
                 case HUNK_ERR_IO:
                     ui_status_bar_reset_text(&ui, &ui.bottom_bar, "ERROR: IO error decoding next patch hunk");
                     rombp_log_err("I/O error during hunk iteration\n");
